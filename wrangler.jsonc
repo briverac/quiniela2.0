@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "quiniela2",
+  "name": "mismo-quiniela",
   "main": "worker/index.ts",
   "compatibility_date": "2025-01-15",
   "assets": {
