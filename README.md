@@ -75,7 +75,7 @@ The worker resolves the tournament by **code in D1** (the app uses `WC26`). That
 
 **Fix:** run **`npm run db:migrate:local`** (or **`db:migrate:remote`** for production). Migration **`0003_wc26_reseed.sql`** runs after `0002`: it **`DELETE`s tournament `id = 1`** (CASCADE clears phases, teams, matches, and prediction data tied to that tournament) and re-inserts the WC26 fixture—the same rows as `0002`, so new installs get WC26 from `0002` and upgraded DBs get corrected by `0003`.
 
-`npm run db:generate-seed` regenerates both **`0002_seed.sql`** and **`0003_wc26_reseed.sql`** so they stay in sync.
+`npm run db:generate-seed` regenerates both **`0002_seed.sql`** and **`0003_wc26_reseed.sql`** so they stay in sync. **Remote D1:** migration SQL must not use `BEGIN TRANSACTION` / `COMMIT` (Wrangler wraps each file; explicit transactions return error 7500).
 
 ## Remote D1 migrations
 
