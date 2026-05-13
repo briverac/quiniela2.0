@@ -1,0 +1,609 @@
+tournament:
+  code: 'WC26'
+admins:
+  - email: 'bryan.rivera@lognllc.com'
+phases:
+  - code: 'A'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'B'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'C'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'D'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'E'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'F'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'G'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'H'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'I'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'J'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'K'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'L'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'round_of_32'
+    level: 2
+    small_points: 2
+    big_points: 4
+    active: false
+  - code: 'round_of_16'
+    level: 3
+    small_points: 2
+    big_points: 5
+    active: false
+  - code: 'quarter_finals'
+    level: 4
+    small_points: 3
+    big_points: 7
+    active: false
+  - code: 'semi_finals'
+    level: 5
+    small_points: 4
+    big_points: 9
+    active: false
+  - code: 'third_place'
+    level: 6
+    small_points: 5
+    big_points: 11
+    active: false
+  - code: 'final'
+    level: 7
+    small_points: 6
+    big_points: 13
+    active: false
+teams:
+  - code: 'mex'
+    group: 'A'
+  - code: 'rsa'
+    group: 'A'
+  - code: 'kor'
+    group: 'A'
+  - code: 'cze'
+    group: 'A'
+  - code: 'can'
+    group: 'B'
+  - code: 'bih'
+    group: 'B'
+  - code: 'qat'
+    group: 'B'
+  - code: 'sui'
+    group: 'B'
+  - code: 'bra'
+    group: 'C'
+  - code: 'mar'
+    group: 'C'
+  - code: 'hai'
+    group: 'C'
+  - code: 'sco'
+    group: 'C'
+  - code: 'usa'
+    group: 'D'
+  - code: 'par'
+    group: 'D'
+  - code: 'aus'
+    group: 'D'
+  - code: 'tur'
+    group: 'D'
+  - code: 'civ'
+    group: 'E'
+  - code: 'ecu'
+    group: 'E'
+  - code: 'ger'
+    group: 'E'
+  - code: 'cuw'
+    group: 'E'
+  - code: 'ned'
+    group: 'F'
+  - code: 'jpn'
+    group: 'F'
+  - code: 'swe'
+    group: 'F'
+  - code: 'tun'
+    group: 'F'
+  - code: 'bel'
+    group: 'G'
+  - code: 'egy'
+    group: 'G'
+  - code: 'irn'
+    group: 'G'
+  - code: 'nzl'
+    group: 'G'
+  - code: 'ksa'
+    group: 'H'
+  - code: 'uru'
+    group: 'H'
+  - code: 'esp'
+    group: 'H'
+  - code: 'cpv'
+    group: 'H'
+  - code: 'fra'
+    group: 'I'
+  - code: 'sen'
+    group: 'I'
+  - code: 'irq'
+    group: 'I'
+  - code: 'nor'
+    group: 'I'
+  - code: 'arg'
+    group: 'J'
+  - code: 'alg'
+    group: 'J'
+  - code: 'aut'
+    group: 'J'
+  - code: 'jor'
+    group: 'J'
+  - code: 'por'
+    group: 'K'
+  - code: 'cod'
+    group: 'K'
+  - code: 'uzb'
+    group: 'K'
+  - code: 'col'
+    group: 'K'
+  - code: 'eng'
+    group: 'L'
+  - code: 'cro'
+    group: 'L'
+  - code: 'gha'
+    group: 'L'
+  - code: 'pan'
+    group: 'L'
+matches:
+  - date: '2026-06-11T19:00:00Z'
+    team1: mex
+    team2: rsa
+    phase: A
+  - date: '2026-06-12T02:00:00Z'
+    team1: kor
+    team2: cze
+    phase: A
+  - date: '2026-06-12T19:00:00Z'
+    team1: can
+    team2: bih
+    phase: B
+  - date: '2026-06-13T01:00:00Z'
+    team1: usa
+    team2: par
+    phase: D
+  - date: '2026-06-14T01:00:00Z'
+    team1: hai
+    team2: sco
+    phase: C
+  - date: '2026-06-14T04:00:00Z'
+    team1: aus
+    team2: tur
+    phase: D
+  - date: '2026-06-13T22:00:00Z'
+    team1: bra
+    team2: mar
+    phase: C
+  - date: '2026-06-13T19:00:00Z'
+    team1: qat
+    team2: sui
+    phase: B
+  - date: '2026-06-14T23:00:00Z'
+    team1: civ
+    team2: ecu
+    phase: E
+  - date: '2026-06-14T17:00:00Z'
+    team1: ger
+    team2: cuw
+    phase: E
+  - date: '2026-06-14T20:00:00Z'
+    team1: ned
+    team2: jpn
+    phase: F
+  - date: '2026-06-15T02:00:00Z'
+    team1: swe
+    team2: tun
+    phase: F
+  - date: '2026-06-15T22:00:00Z'
+    team1: ksa
+    team2: uru
+    phase: H
+  - date: '2026-06-15T16:00:00Z'
+    team1: esp
+    team2: cpv
+    phase: H
+  - date: '2026-06-16T01:00:00Z'
+    team1: irn
+    team2: nzl
+    phase: G
+  - date: '2026-06-15T19:00:00Z'
+    team1: bel
+    team2: egy
+    phase: G
+  - date: '2026-06-16T19:00:00Z'
+    team1: fra
+    team2: sen
+    phase: I
+  - date: '2026-06-16T22:00:00Z'
+    team1: irq
+    team2: nor
+    phase: I
+  - date: '2026-06-17T01:00:00Z'
+    team1: arg
+    team2: alg
+    phase: J
+  - date: '2026-06-17T04:00:00Z'
+    team1: aut
+    team2: jor
+    phase: J
+  - date: '2026-06-18T00:00:00Z'
+    team1: gha
+    team2: pan
+    phase: L
+  - date: '2026-06-17T19:00:00Z'
+    team1: eng
+    team2: cro
+    phase: L
+  - date: '2026-06-17T17:00:00Z'
+    team1: por
+    team2: cod
+    phase: K
+  - date: '2026-06-18T02:00:00Z'
+    team1: uzb
+    team2: col
+    phase: K
+  - date: '2026-06-18T16:00:00Z'
+    team1: cze
+    team2: rsa
+    phase: A
+  - date: '2026-06-18T19:00:00Z'
+    team1: sui
+    team2: bih
+    phase: B
+  - date: '2026-06-18T22:00:00Z'
+    team1: can
+    team2: qat
+    phase: B
+  - date: '2026-06-19T01:00:00Z'
+    team1: mex
+    team2: kor
+    phase: A
+  - date: '2026-06-20T01:00:00Z'
+    team1: bra
+    team2: hai
+    phase: C
+  - date: '2026-06-19T22:00:00Z'
+    team1: sco
+    team2: mar
+    phase: C
+  - date: '2026-06-20T04:00:00Z'
+    team1: tur
+    team2: par
+    phase: D
+  - date: '2026-06-19T19:00:00Z'
+    team1: usa
+    team2: aus
+    phase: D
+  - date: '2026-06-20T20:00:00Z'
+    team1: ger
+    team2: civ
+    phase: E
+  - date: '2026-06-21T00:00:00Z'
+    team1: ecu
+    team2: cuw
+    phase: E
+  - date: '2026-06-20T17:00:00Z'
+    team1: ned
+    team2: swe
+    phase: F
+  - date: '2026-06-21T04:00:00Z'
+    team1: tun
+    team2: jpn
+    phase: F
+  - date: '2026-06-21T22:00:00Z'
+    team1: uru
+    team2: cpv
+    phase: H
+  - date: '2026-06-21T16:00:00Z'
+    team1: esp
+    team2: ksa
+    phase: H
+  - date: '2026-06-21T19:00:00Z'
+    team1: bel
+    team2: irn
+    phase: G
+  - date: '2026-06-22T01:00:00Z'
+    team1: nzl
+    team2: egy
+    phase: G
+  - date: '2026-06-23T00:00:00Z'
+    team1: nor
+    team2: sen
+    phase: I
+  - date: '2026-06-22T21:00:00Z'
+    team1: fra
+    team2: irq
+    phase: I
+  - date: '2026-06-22T17:00:00Z'
+    team1: arg
+    team2: aut
+    phase: J
+  - date: '2026-06-23T03:00:00Z'
+    team1: jor
+    team2: alg
+    phase: J
+  - date: '2026-06-23T20:00:00Z'
+    team1: eng
+    team2: gha
+    phase: L
+  - date: '2026-06-23T23:00:00Z'
+    team1: pan
+    team2: cro
+    phase: L
+  - date: '2026-06-23T17:00:00Z'
+    team1: por
+    team2: uzb
+    phase: K
+  - date: '2026-06-24T02:00:00Z'
+    team1: col
+    team2: cod
+    phase: K
+  - date: '2026-06-24T22:00:00Z'
+    team1: sco
+    team2: bra
+    phase: C
+  - date: '2026-06-24T22:00:00Z'
+    team1: mar
+    team2: hai
+    phase: C
+  - date: '2026-06-24T19:00:00Z'
+    team1: sui
+    team2: can
+    phase: B
+  - date: '2026-06-24T19:00:00Z'
+    team1: bih
+    team2: qat
+    phase: B
+  - date: '2026-06-25T03:00:00Z'
+    team1: cze
+    team2: mex
+    phase: A
+  - date: '2026-06-25T01:00:00Z'
+    team1: rsa
+    team2: kor
+    phase: A
+  - date: '2026-06-25T20:00:00Z'
+    team1: cuw
+    team2: civ
+    phase: E
+  - date: '2026-06-25T20:00:00Z'
+    team1: ecu
+    team2: ger
+    phase: E
+  - date: '2026-06-25T23:00:00Z'
+    team1: jpn
+    team2: swe
+    phase: F
+  - date: '2026-06-25T23:00:00Z'
+    team1: tun
+    team2: ned
+    phase: F
+  - date: '2026-06-26T02:00:00Z'
+    team1: tur
+    team2: usa
+    phase: D
+  - date: '2026-06-26T02:00:00Z'
+    team1: par
+    team2: aus
+    phase: D
+  - date: '2026-06-26T19:00:00Z'
+    team1: nor
+    team2: fra
+    phase: I
+  - date: '2026-06-26T19:00:00Z'
+    team1: sen
+    team2: irq
+    phase: I
+  - date: '2026-06-27T03:00:00Z'
+    team1: egy
+    team2: irn
+    phase: G
+  - date: '2026-06-27T03:00:00Z'
+    team1: nzl
+    team2: bel
+    phase: G
+  - date: '2026-06-27T00:00:00Z'
+    team1: cpv
+    team2: ksa
+    phase: H
+  - date: '2026-06-27T00:00:00Z'
+    team1: uru
+    team2: esp
+    phase: H
+  - date: '2026-06-27T21:00:00Z'
+    team1: pan
+    team2: eng
+    phase: L
+  - date: '2026-06-27T21:00:00Z'
+    team1: cro
+    team2: gha
+    phase: L
+  - date: '2026-06-28T02:00:00Z'
+    team1: alg
+    team2: aut
+    phase: J
+  - date: '2026-06-28T02:00:00Z'
+    team1: jor
+    team2: arg
+    phase: J
+  - date: '2026-06-27T23:30:00Z'
+    team1: col
+    team2: por
+    phase: K
+  - date: '2026-06-27T23:30:00Z'
+    team1: cod
+    team2: uzb
+    phase: K
+  - date: '2026-06-28T19:00:00Z'
+    team1_label: '2A'
+    team2_label: '2B'
+    phase: round_of_32
+  - date: '2026-06-29T20:30:00Z'
+    team1_label: '1E'
+    team2_label: '3ABCDF'
+    phase: round_of_32
+  - date: '2026-06-30T01:00:00Z'
+    team1_label: '1F'
+    team2_label: '2C'
+    phase: round_of_32
+  - date: '2026-06-29T17:00:00Z'
+    team1_label: '1E'
+    team2_label: '2F'
+    phase: round_of_32
+  - date: '2026-06-30T21:00:00Z'
+    team1_label: '1I'
+    team2_label: '3CDFGH'
+    phase: round_of_32
+  - date: '2026-06-30T17:00:00Z'
+    team1_label: '2E'
+    team2_label: '2I'
+    phase: round_of_32
+  - date: '2026-07-01T01:00:00Z'
+    team1_label: '1A'
+    team2_label: '3CEFHI'
+    phase: round_of_32
+  - date: '2026-07-01T16:00:00Z'
+    team1_label: '1L'
+    team2_label: '3EHIJK'
+    phase: round_of_32
+  - date: '2026-07-02T00:00:00Z'
+    team1_label: '1D'
+    team2_label: '3BEFIJ'
+    phase: round_of_32
+  - date: '2026-07-01T20:00:00Z'
+    team1_label: '1G'
+    team2_label: '3AEHIJ'
+    phase: round_of_32
+  - date: '2026-07-02T23:00:00Z'
+    team1_label: '2K'
+    team2_label: '2L'
+    phase: round_of_32
+  - date: '2026-07-02T19:00:00Z'
+    team1_label: '1H'
+    team2_label: '2J'
+    phase: round_of_32
+  - date: '2026-07-03T03:00:00Z'
+    team1_label: '1B'
+    team2_label: '3EFGIJ'
+    phase: round_of_32
+  - date: '2026-07-03T22:00:00Z'
+    team1_label: '1J'
+    team2_label: '2H'
+    phase: round_of_32
+  - date: '2026-07-04T01:30:00Z'
+    team1_label: '1K'
+    team2_label: '3DEIJL'
+    phase: round_of_32
+  - date: '2026-07-03T18:00:00Z'
+    team1_label: '2D'
+    team2_label: '2G'
+    phase: round_of_32
+  - date: '2026-07-04T21:00:00Z'
+    team1_label: 'W74'
+    team2_label: 'W77'
+    phase: round_of_16
+  - date: '2026-07-04T17:00:00Z'
+    team1_label: 'W73'
+    team2_label: 'W75'
+    phase: round_of_16
+  - date: '2026-07-05T20:00:00Z'
+    team1_label: 'W76'
+    team2_label: 'W78'
+    phase: round_of_16
+  - date: '2026-07-06T00:00:00Z'
+    team1_label: 'W79'
+    team2_label: 'W80'
+    phase: round_of_16
+  - date: '2026-07-06T19:00:00Z'
+    team1_label: 'W83'
+    team2_label: 'W84'
+    phase: round_of_16
+  - date: '2026-07-07T00:00:00Z'
+    team1_label: 'W81'
+    team2_label: 'W82'
+    phase: round_of_16
+  - date: '2026-07-07T16:00:00Z'
+    team1_label: 'W86'
+    team2_label: 'W88'
+    phase: round_of_16
+  - date: '2026-07-07T20:00:00Z'
+    team1_label: 'W85'
+    team2_label: 'W87'
+    phase: round_of_16
+  - date: '2026-07-09T20:00:00Z'
+    team1_label: 'W89'
+    team2_label: 'W90'
+    phase: quarter_finals
+  - date: '2026-07-10T19:00:00Z'
+    team1_label: 'W93'
+    team2_label: 'W94'
+    phase: quarter_finals
+  - date: '2026-07-11T21:00:00Z'
+    team1_label: 'W91'
+    team2_label: 'W92'
+    phase: quarter_finals
+  - date: '2026-07-12T01:00:00Z'
+    team1_label: 'W95'
+    team2_label: 'W96'
+    phase: quarter_finals
+  - date: '2026-07-14T19:00:00Z'
+    team1_label: 'W97'
+    team2_label: 'W98'
+    phase: semi_finals
+  - date: '2026-07-15T19:00:00Z'
+    team1_label: 'W99'
+    team2_label: 'W100'
+    phase: semi_finals
+  - date: '2026-07-18T21:00:00Z'
+    team1_label: 'L101'
+    team2_label: 'L102'
+    phase: third_place
+  - date: '2026-07-19T17:00:00Z'
+    team1_label: 'W101'
+    team2_label: 'W102'
+    phase: final

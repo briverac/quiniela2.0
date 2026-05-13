@@ -1,0 +1,208 @@
+:root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.5;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #2563eb;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.page.center {
+  text-align: center;
+  padding-top: 4rem;
+}
+
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.25rem;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.header a {
+  color: #e2e8f0;
+  text-decoration: none;
+}
+
+.header a:hover {
+  text-decoration: underline;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.userbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.main {
+  flex: 1;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.avatar.sm {
+  width: 24px;
+  height: 24px;
+  margin-right: 0.35rem;
+}
+
+.muted {
+  color: #64748b;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.ok {
+  color: #15803d;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.table th,
+.table td {
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.table th {
+  background: #f1f5f9;
+  font-size: 0.85rem;
+}
+
+.phase-block {
+  margin-top: 2rem;
+}
+
+.button {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.button.primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #1d4ed8;
+  text-decoration: none;
+}
+
+.button.small {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.button.danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.linkbtn {
+  background: none;
+  border: none;
+  color: #93c5fd;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.score {
+  width: 3rem;
+  padding: 0.25rem;
+}
+
+.pred-inputs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.badge {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  background: #e2e8f0;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.points-line {
+  font-size: 1.1rem;
+}
+
+.actions {
+  margin: 1rem 0;
+}
+
+.form-row,
+.form-col {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.form-col {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}

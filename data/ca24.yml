@@ -1,0 +1,206 @@
+admins:
+  - email: 'bryan.rivera@lognllc.com'
+phases:
+  - code: 'A'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'B'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'C'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'D'
+    level: 1
+    small_points: 1
+    big_points: 3
+    active: true
+  - code: 'quarter_finals'
+    level: 3
+    small_points: 3
+    big_points: 7
+    active: false
+  - code: 'semi_finals'
+    level: 4
+    small_points: 4
+    big_points: 9
+    active: false
+  - code: 'third_place'
+    level: 5
+    small_points: 5
+    big_points: 11
+    active: false
+  - code: 'final'
+    level: 6
+    small_points: 6
+    big_points: 13
+    active: false
+teams:
+  - code: 'arg'
+    group: 'A'
+  - code: 'per'
+    group: 'A'
+  - code: 'chi'
+    group: 'A'
+  - code: 'can'
+    group: 'A'
+  - code: 'mex'
+    group: 'B'
+  - code: 'ecu'
+    group: 'B'
+  - code: 'ven'
+    group: 'B'
+  - code: 'jam'
+    group: 'B'
+  - code: 'usa'
+    group: 'C'
+  - code: 'uru'
+    group: 'C'
+  - code: 'pan'
+    group: 'C'
+  - code: 'bol'
+    group: 'C'
+  - code: 'bra'
+    group: 'D'
+  - code: 'col'
+    group: 'D'
+  - code: 'par'
+    group: 'D'
+  - code: 'crc'
+    group: 'D'
+
+matches:
+  - date: '2024-06-20 18:00 CST'
+    team1: arg
+    team2: can
+    phase: A
+  - date: '2024-06-21 18:00 CST'
+    team1: per
+    team2: chi
+    phase: A
+  - date: '2024-06-22 16:00 CST'
+    team1: ecu
+    team2: ven
+    phase: B
+  - date: '2024-06-22 19:00 CST'
+    team1: mex
+    team2: jam
+    phase: B
+  - date: '2024-06-23 16:00 CST'
+    team1: usa
+    team2: bol
+    phase: C
+  - date: '2024-06-23 19:00 CST'
+    team1: uru
+    team2: pan
+    phase: C
+  - date: '2024-06-24 16:00 CST'
+    team1: col
+    team2: par
+    phase: D
+  - date: '2024-06-24 19:00 CST'
+    team1: bra
+    team2: crc
+    phase: D
+  - date: '2024-06-25 16:00 CST'
+    team1: per
+    team2: can
+    phase: A
+  - date: '2024-06-25 19:00 CST'
+    team1: chi
+    team2: arg
+    phase: A
+  - date: '2024-06-26 16:00 CST'
+    team1: ecu
+    team2: jam
+    phase: B
+  - date: '2024-06-26 19:00 CST'
+    team1: ven
+    team2: mex
+    phase: B
+  - date: '2024-06-27 16:00 CST'
+    team1: pan
+    team2: usa
+    phase: C
+  - date: '2024-06-27 19:00 CST'
+    team1: uru
+    team2: bol
+    phase: C
+  - date: '2024-06-28 16:00 CST'
+    team1: col
+    team2: crc
+    phase: D
+  - date: '2024-06-28 19:00 CST'
+    team1: par
+    team2: bra
+    phase: D
+  - date: '2024-06-29 18:00 CST'
+    team1: arg
+    team2: per
+    phase: A
+  - date: '2024-06-29 18:00 CST'
+    team1: can
+    team2: chi
+    phase: A
+  - date: '2024-06-30 18:00 CST'
+    team1: jam
+    team2: ven
+    phase: B
+  - date: '2024-06-30 18:00 CST'
+    team1: mex
+    team2: ecu
+    phase: B
+  - date: '2024-07-01 19:00 CST'
+    team1: bol
+    team2: pan
+    phase: C
+  - date: '2024-07-01 19:00 CST'
+    team1: usa
+    team2: uru
+    phase: C
+  - date: '2024-07-02 19:00 CST'
+    team1: crc
+    team2: par
+    phase: D
+  - date: '2024-07-02 19:00 CST'
+    team1: bra
+    team2: col
+    phase: D
+  - date: '2024-07-04 19:00 CST'
+    phase: quarter_finals
+    team1_label: 1A
+    team2_label: 2B
+  - date: '2024-07-05 19:00 CST'
+    phase: quarter_finals
+    team1_label: 1B
+    team2_label: 2A
+  - date: '2024-07-06 16:00 CST'
+    phase: quarter_finals
+    team1_label: 1C
+    team2_label: 2D
+  - date: '2024-07-06 19:00 CST'
+    phase: quarter_finals
+    team1_label: 1D
+    team2_label: 2C
+  - date: '2024-07-09 18:00 CST'
+    phase: semi_finals
+    team1_label: W25
+    team2_label: W26
+  - date: '2024-07-10 18:00 CST'
+    phase: semi_finals
+    team1_label: W27
+    team2_label: W28
+  - date: '2024-07-13 18:00 CST'
+    phase: third_place
+    team1_label: L29
+    team2_label: L30
+  - date: '2024-07-14 18:00 CST'
+    phase: final
+    team1_label: W29
+    team2_label: W30

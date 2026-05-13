@@ -1,0 +1,20 @@
+# Dependencies
+node_modules
+
+# Build / Cloudflare
+dist
+.wrangler
+
+# Secrets (local only)
+.dev.vars
+.dev.vars.*
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Misc
+*.local.sql
+.DS_Store
+*.log

@@ -1,0 +1,778 @@
+import { Hono } from "hono";
+import type { Context } from "hono";
+import { eq, and, asc, inArray } from "drizzle-orm";
+import { Google, generateCodeVerifier, generateState } from "arctic";
+import { getDb } from "./db/drizzle";
+import * as schema from "./db/schema";
+import type { HonoEnv, UserRow } from "./types";
+import {
+  clearSessionCookie,
+  createSession,
+  deleteSession,
+  getUserFromSessionCookie,
+  setSessionCookie,
+} from "./session";
+import {
+  ensurePredictionSet,
+  getTournamentIdByCode,
+  processMatchPoints,
+  buildStatsByMatchNumber,
+  positionBoard,
+  groupStandings,
+} from "./services/domain";
+import { matchClosed, validPredictionScores } from "./lib/matchLogic";
+import { teamName, phaseName, tournamentName } from "./lib/i18n";
+
+const CA = "WC26";
+
+function tournamentNotFound(c: Context<HonoEnv>, code: string) {
+  return c.json(
+    {
+      error: "Tournament not found",
+      code,
+      hint:
+        "Run D1 migrations (npm run db:migrate:local). If the DB was seeded with CA24 before WC26, migration 0003_wc26_reseed.sql clears tournament id=1 and reloads the fixture.",
+    },
+    404
+  );
+}
+
+function googleClient(c: { req: { url: string } }, env: HonoEnv["Bindings"]) {
+  const origin = new URL(c.req.url).origin;
+  return new Google(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, `${origin}/api/auth/google/callback`);
+}
+
+function adminEmails(env: HonoEnv["Bindings"]): Set<string> {
+  const s = env.ADMIN_EMAILS ?? "";
+  return new Set(
+    s
+      .split(",")
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+const app = new Hono<HonoEnv>();
+
+function isSecureCookies(c: Context<HonoEnv>) {
+  const h = new URL(c.req.url).hostname;
+  return h !== "localhost" && h !== "127.0.0.1";
+}
+
+app.use("*", async (c, next) => {
+  const db = getDb(c.env.DB);
+  c.set("db", db);
+  const user = await getUserFromSessionCookie(db, c.req.header("Cookie"));
+  c.set("user", user);
+  await next();
+});
+
+app.get("/api/health", (c) => c.json({ ok: true }));
+
+/** --- Google OAuth --- */
+app.get("/api/auth/google", async (c) => {
+  const state = generateState();
+  const codeVerifier = generateCodeVerifier();
+  const url = googleClient(c, c.env).createAuthorizationURL(state, codeVerifier, [
+    "openid",
+    "email",
+    "profile",
+  ]);
+  const maxAge = 600;
+  const sec = isSecureCookies(c) ? "Secure; " : "";
+  const ck = [
+    `oauth_state=${encodeURIComponent(state)}; Path=/api/auth; HttpOnly; ${sec}SameSite=Lax; Max-Age=${maxAge}`,
+    `oauth_verifier=${encodeURIComponent(codeVerifier)}; Path=/api/auth; HttpOnly; ${sec}SameSite=Lax; Max-Age=${maxAge}`,
+  ];
+  for (const line of ck) {
+    c.header("Set-Cookie", line, { append: true });
+  }
+  return c.redirect(url.toString(), 302);
+});
+
+app.get("/api/auth/google/callback", async (c) => {
+  const db = c.var.db;
+  const code = c.req.query("code");
+  const state = c.req.query("state");
+  const err = c.req.query("error");
+  if (err) return c.redirect(`/?error=${encodeURIComponent(err)}`, 302);
+  if (!code || !state) return c.redirect("/?error=oauth", 302);
+
+  const cookies = parseCookies(c.req.header("Cookie"));
+  if (state !== cookies.oauth_state || !cookies.oauth_verifier) {
+    return c.redirect("/?error=state", 302);
+  }
+
+  let tokens;
+  try {
+    tokens = await googleClient(c, c.env).validateAuthorizationCode(code, cookies.oauth_verifier);
+  } catch {
+    return c.redirect("/?error=token", 302);
+  }
+
+  const access = tokens.accessToken();
+  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${access}` },
+  });
+  if (!res.ok) return c.redirect("/?error=userinfo", 302);
+  const info = (await res.json()) as {
+    sub: string;
+    email: string;
+    name?: string;
+    picture?: string;
+  };
+
+  const now = new Date().toISOString();
+  const admins = adminEmails(c.env);
+  const isAdmin = admins.has(info.email.toLowerCase());
+
+  const existing = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.email, info.email))
+    .limit(1);
+  let user: UserRow;
+  if (existing[0]) {
+    if (!existing[0].active) return c.redirect("/?error=inactive", 302);
+    await db
+      .update(schema.users)
+      .set({
+        provider: "google",
+        uid: info.sub,
+        name: info.name ?? existing[0].name,
+        picture: info.picture ?? existing[0].picture,
+        image: info.picture ?? existing[0].image,
+        admin: isAdmin || existing[0].admin,
+        updatedAt: now,
+      })
+      .where(eq(schema.users.id, existing[0].id));
+    const u2 = await db.select().from(schema.users).where(eq(schema.users.id, existing[0].id)).limit(1);
+    user = u2[0]!;
+  } else {
+    await db.insert(schema.users).values({
+      email: info.email,
+      provider: "google",
+      uid: info.sub,
+      name: info.name ?? null,
+      picture: info.picture ?? null,
+      image: info.picture ?? null,
+      active: true,
+      admin: isAdmin,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const u2 = await db.select().from(schema.users).where(eq(schema.users.email, info.email)).limit(1);
+    user = u2[0]!;
+  }
+
+  const tid = await getTournamentIdByCode(db, CA);
+  if (tid) await ensurePredictionSet(db, user.id, tid);
+
+  const sid = await createSession(db, user.id);
+  const sec = isSecureCookies(c) ? "Secure; " : "";
+  const clearOauth = [
+    `oauth_state=; Path=/api/auth; HttpOnly; ${sec}SameSite=Lax; Max-Age=0`,
+    `oauth_verifier=; Path=/api/auth; HttpOnly; ${sec}SameSite=Lax; Max-Age=0`,
+  ];
+  for (const line of clearOauth) {
+    c.header("Set-Cookie", line, { append: true });
+  }
+  c.header("Set-Cookie", setSessionCookie(sid, isSecureCookies(c)), { append: true });
+  return c.redirect("/predictions", 302);
+});
+
+app.post("/api/auth/logout", async (c) => {
+  const db = c.var.db;
+  const cookies = parseCookies(c.req.header("Cookie"));
+  const sid = cookies.quiniela_session;
+  if (sid) await deleteSession(db, decodeURIComponent(sid));
+  c.header("Set-Cookie", clearSessionCookie(isSecureCookies(c)));
+  return c.json({ ok: true });
+});
+
+function parseCookies(h: string | undefined): Record<string, string> {
+  const o: Record<string, string> = {};
+  if (!h) return o;
+  for (const part of h.split(";")) {
+    const i = part.indexOf("=");
+    if (i === -1) continue;
+    o[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+  }
+  return o;
+}
+
+/** --- Me & bootstrap --- */
+app.get("/api/me", (c) => {
+  const u = c.var.user;
+  if (!u) return c.json({ user: null });
+  return c.json({
+    user: {
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      picture: u.picture ?? u.image,
+      admin: u.admin,
+    },
+  });
+});
+
+app.get("/api/tournaments/:code/bootstrap", async (c) => {
+  const code = c.req.param("code");
+  const db = c.var.db;
+  const tid = await getTournamentIdByCode(db, code);
+  if (!tid) return tournamentNotFound(c, code);
+
+  const phases = await db.select().from(schema.phases).where(eq(schema.phases.tournamentId, tid));
+  const teams = await db.select().from(schema.teams).where(eq(schema.teams.tournamentId, tid));
+  const matchRows = await db.select().from(schema.matches).where(eq(schema.matches.tournamentId, tid));
+
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const phaseById = new Map(phases.map((p) => [p.id, p]));
+
+  const matches = matchRows
+    .map((m) => {
+      const t1 = m.team1Id ? teamById.get(m.team1Id) : undefined;
+      const t2 = m.team2Id ? teamById.get(m.team2Id) : undefined;
+      const ph = phaseById.get(m.phaseId);
+      return {
+        id: m.id,
+        number: m.number,
+        date: m.date,
+        phaseId: m.phaseId,
+        phaseCode: ph?.code,
+        phaseName: ph ? phaseName(ph.code) : "",
+        team1Id: m.team1Id,
+        team2Id: m.team2Id,
+        team1Code: t1?.code ?? null,
+        team2Code: t2?.code ?? null,
+        team1Name: t1 ? teamName(t1.code) : m.team1Label,
+        team2Name: t2 ? teamName(t2.code) : m.team2Label,
+        team1Label: m.team1Label,
+        team2Label: m.team2Label,
+        team1Score: m.team1Score,
+        team2Score: m.team2Score,
+        isClosed: m.isClosed,
+        closed: matchClosed(m),
+        ready: m.ready,
+      };
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  return c.json({
+    data: {
+      tournament: { code, name: tournamentName },
+      phases: phases.map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: phaseName(p.code),
+        level: p.level,
+        smallPoints: p.smallPoints,
+        bigPoints: p.bigPoints,
+        active: p.active,
+      })),
+      teams: teams.map((t) => ({
+        id: t.id,
+        code: t.code,
+        name: teamName(t.code),
+        group: t.group,
+      })),
+      matches,
+    },
+  });
+});
+
+/** --- Predictions (auth) --- */
+app.get("/api/predictions", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const db = c.var.db;
+  const tid = await getTournamentIdByCode(db, CA);
+  if (!tid) return tournamentNotFound(c, CA);
+  await ensurePredictionSet(db, u.id, tid);
+
+  const setRows = await db
+    .select()
+    .from(schema.predictionSets)
+    .where(and(eq(schema.predictionSets.userId, u.id), eq(schema.predictionSets.tournamentId, tid)))
+    .limit(1);
+  const set = setRows[0];
+  if (!set) return c.json({ error: "No prediction set" }, 500);
+
+  const preds = await db
+    .select({
+      id: schema.predictions.id,
+      matchId: schema.predictions.matchId,
+      score1: schema.predictions.score1,
+      score2: schema.predictions.score2,
+      points: schema.predictions.points,
+    })
+    .from(schema.predictions)
+    .where(eq(schema.predictions.predictionSetId, set.id));
+
+  const stats = await buildStatsByMatchNumber(db);
+  return c.json({
+    data: {
+      predictionSet: { id: set.id, points: set.points },
+      predictions: preds,
+      statsByMatchNumber: stats,
+    },
+  });
+});
+
+app.put("/api/predictions", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const body = await c.req.json<{ items?: { predictionId: number; score1: number; score2: number }[] }>();
+  const items = body.items ?? [];
+  const db = c.var.db;
+  const tid = await getTournamentIdByCode(db, CA);
+  if (!tid) return tournamentNotFound(c, CA);
+
+  const setRows = await db
+    .select()
+    .from(schema.predictionSets)
+    .where(and(eq(schema.predictionSets.userId, u.id), eq(schema.predictionSets.tournamentId, tid)))
+    .limit(1);
+  const set = setRows[0];
+  if (!set) return c.json({ error: "No prediction set" }, 404);
+
+  const now = new Date().toISOString();
+  for (const it of items) {
+    const prow = await db
+      .select()
+      .from(schema.predictions)
+      .where(and(eq(schema.predictions.id, it.predictionId), eq(schema.predictions.predictionSetId, set.id)))
+      .limit(1);
+    const p = prow[0];
+    if (!p) continue;
+    const mrows = await db.select().from(schema.matches).where(eq(schema.matches.id, p.matchId)).limit(1);
+    const m = mrows[0];
+    if (!m) continue;
+    if (matchClosed(m)) continue;
+    if (it.score1 < 0 || it.score1 > 99 || it.score2 < 0 || it.score2 > 99) continue;
+    await db
+      .update(schema.predictions)
+      .set({ score1: it.score1, score2: it.score2, updatedAt: now })
+      .where(eq(schema.predictions.id, p.id));
+  }
+  return c.json({ ok: true });
+});
+
+/** --- Stats one match --- */
+app.get("/api/matches/:id/stats", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  const mrows = await db.select().from(schema.matches).where(eq(schema.matches.id, id)).limit(1);
+  const m = mrows[0];
+  if (!m) return c.json({ error: "Not found" }, 404);
+  const preds = await db
+    .select({ score1: schema.predictions.score1, score2: schema.predictions.score2 })
+    .from(schema.predictions)
+    .where(eq(schema.predictions.matchId, id));
+  const valid = preds.filter((p) => validPredictionScores(p.score1, p.score2));
+  if (!valid.length) {
+    return c.json({ data: { team1: 0, team2: 0, tie: 0 } });
+  }
+  let w1 = 0,
+    w2 = 0,
+    t = 0;
+  for (const p of valid) {
+    if (p.score1! > p.score2!) w1++;
+    else if (p.score2! > p.score1!) w2++;
+    else t++;
+  }
+  const n = valid.length;
+  return c.json({
+    data: {
+      team1: (w1 / n) * 100,
+      team2: (w2 / n) * 100,
+      tie: (t / n) * 100,
+    },
+  });
+});
+
+/** --- Groups --- */
+app.get("/api/groups/standings", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const data = await groupStandings(c.var.db);
+  return c.json({
+    data: data.map((g) => ({
+      code: g.code,
+      teams: g.teams.map((t) => ({
+        ...t,
+        name: teamName(t.code),
+      })),
+    })),
+  });
+});
+
+/** --- Leaderboards --- */
+app.get("/api/leaderboards", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const db = c.var.db;
+  const general = await positionBoard(db, {});
+  const mine = await db
+    .select({ id: schema.leaderboards.id, name: schema.leaderboards.name, code: schema.leaderboards.code })
+    .from(schema.leaderboards)
+    .innerJoin(
+      schema.leaderboardsUsers,
+      eq(schema.leaderboards.id, schema.leaderboardsUsers.leaderboardId)
+    )
+    .where(eq(schema.leaderboardsUsers.userId, u.id));
+
+  const boards = await Promise.all(
+    mine.map(async (lb) => ({
+      ...lb,
+      positions: await positionBoard(db, { leaderboardId: lb.id }),
+    }))
+  );
+
+  return c.json({ data: { general, boards } });
+});
+
+app.post("/api/leaderboards", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const body = await c.req.json<{ name?: string; private?: boolean }>();
+  const name = (body.name ?? "").trim();
+  if (name.length < 3 || name.length > 40) return c.json({ error: "Name must be 3-40 characters" }, 400);
+  const db = c.var.db;
+  const dup = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.name, name)).limit(1);
+  if (dup[0]) return c.json({ error: "Name taken" }, 400);
+  const now = new Date().toISOString();
+  const code = crypto.randomUUID();
+  await db.insert(schema.leaderboards).values({
+    name,
+    code,
+    ownerId: u.id,
+    active: true,
+    private: body.private !== false,
+    createdAt: now,
+    updatedAt: now,
+  });
+  const row = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.name, name)).limit(1);
+  const lb = row[0]!;
+  await db.insert(schema.leaderboardsUsers).values({ leaderboardId: lb.id, userId: u.id });
+  return c.json({ data: lb });
+});
+
+app.put("/api/leaderboards/:id", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{ name?: string; private?: boolean }>();
+  const db = c.var.db;
+  const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
+  if (!lb[0]) return c.json({ error: "Not found" }, 404);
+  if (lb[0].ownerId !== u.id) return c.json({ error: "Forbidden" }, 403);
+  const now = new Date().toISOString();
+  await db
+    .update(schema.leaderboards)
+    .set({
+      name: body.name?.trim() ?? lb[0].name,
+      private: body.private ?? lb[0].private,
+      updatedAt: now,
+    })
+    .where(eq(schema.leaderboards.id, id));
+  return c.json({ ok: true });
+});
+
+app.post("/api/leaderboards/:id/leave", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  await db
+    .delete(schema.leaderboardsUsers)
+    .where(and(eq(schema.leaderboardsUsers.leaderboardId, id), eq(schema.leaderboardsUsers.userId, u.id)));
+  return c.json({ ok: true });
+});
+
+app.post("/api/leaderboards/:id/members/remove", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{ userIds?: number[] }>();
+  const db = c.var.db;
+  const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
+  if (!lb[0] || lb[0].ownerId !== u.id) return c.json({ error: "Forbidden" }, 403);
+  const ids = (body.userIds ?? []).filter((uid) => uid !== u.id);
+  for (const uid of ids) {
+    await db
+      .delete(schema.leaderboardsUsers)
+      .where(and(eq(schema.leaderboardsUsers.leaderboardId, id), eq(schema.leaderboardsUsers.userId, uid)));
+  }
+  return c.json({ ok: true });
+});
+
+app.get("/api/leaderboards/manage", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const db = c.var.db;
+  const owned = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.ownerId, u.id));
+  const invs = await db
+    .select({
+      id: schema.invitations.id,
+      leaderboardId: schema.invitations.leaderboardId,
+      leaderboardName: schema.leaderboards.name,
+    })
+    .from(schema.invitations)
+    .innerJoin(schema.leaderboards, eq(schema.invitations.leaderboardId, schema.leaderboards.id))
+    .where(eq(schema.invitations.userId, u.id));
+  return c.json({ data: { owned, invitations: invs } });
+});
+
+app.get("/api/leaderboards/:id/members", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
+  if (!lb[0] || lb[0].ownerId !== u.id) return c.json({ error: "Forbidden" }, 403);
+  const mids = await db
+    .select({ userId: schema.leaderboardsUsers.userId })
+    .from(schema.leaderboardsUsers)
+    .where(eq(schema.leaderboardsUsers.leaderboardId, id));
+  if (!mids.length) return c.json({ data: [] });
+  const users = await db
+    .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+    .from(schema.users)
+    .where(inArray(schema.users.id, mids.map((m) => m.userId)));
+  return c.json({ data: users });
+});
+
+app.get("/api/leaderboards/:id/invite-candidates", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
+  if (!lb[0] || lb[0].ownerId !== u.id) return c.json({ error: "Forbidden" }, 403);
+
+  const members = await db
+    .select({ userId: schema.leaderboardsUsers.userId })
+    .from(schema.leaderboardsUsers)
+    .where(eq(schema.leaderboardsUsers.leaderboardId, id));
+  const memberIds = new Set(members.map((m) => m.userId));
+
+  const pending = await db
+    .select({ userId: schema.invitations.userId })
+    .from(schema.invitations)
+    .where(eq(schema.invitations.leaderboardId, id));
+  const pendingIds = new Set(pending.map((p) => p.userId));
+
+  const all = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.active, true))
+    .orderBy(asc(schema.users.name), asc(schema.users.email));
+
+  const candidates = all
+    .filter((x) => !memberIds.has(x.id) && !pendingIds.has(x.id) && x.id !== u.id)
+    .map((x) => ({ id: x.id, name: x.name, email: x.email }));
+  return c.json({ data: candidates });
+});
+
+app.post("/api/leaderboards/:id/invitations", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{ userId?: number }>();
+  const targetId = body.userId;
+  if (targetId == null) return c.json({ error: "userId required" }, 400);
+  const db = c.var.db;
+  const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
+  if (!lb[0] || lb[0].ownerId !== u.id) return c.json({ error: "Forbidden" }, 403);
+  const dup = await db
+    .select()
+    .from(schema.invitations)
+    .where(and(eq(schema.invitations.leaderboardId, id), eq(schema.invitations.userId, targetId)))
+    .limit(1);
+  if (dup[0]) return c.json({ error: "Already invited" }, 400);
+  const now = new Date().toISOString();
+  await db.insert(schema.invitations).values({
+    leaderboardId: id,
+    userId: targetId,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return c.json({ ok: true });
+});
+
+app.post("/api/invitations/:id/accept", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  const inv = await db.select().from(schema.invitations).where(eq(schema.invitations.id, id)).limit(1);
+  if (!inv[0] || inv[0].userId !== u.id) return c.json({ error: "Not found" }, 404);
+  await db.insert(schema.leaderboardsUsers).values({
+    leaderboardId: inv[0].leaderboardId,
+    userId: u.id,
+  });
+  await db.delete(schema.invitations).where(eq(schema.invitations.id, id));
+  return c.json({ ok: true });
+});
+
+app.post("/api/invitations/:id/reject", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  const inv = await db.select().from(schema.invitations).where(eq(schema.invitations.id, id)).limit(1);
+  if (!inv[0] || inv[0].userId !== u.id) return c.json({ error: "Not found" }, 404);
+  await db.delete(schema.invitations).where(eq(schema.invitations.id, id));
+  return c.json({ ok: true });
+});
+
+/** --- Admin --- */
+async function requireAdmin(c: Context<HonoEnv>) {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  if (!u.admin) return c.json({ error: "Forbidden" }, 403);
+  return null;
+}
+
+app.get("/api/admin/matches", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const db = c.var.db;
+  const tid = await getTournamentIdByCode(db, CA);
+  if (!tid) return tournamentNotFound(c, CA);
+  const rows = await db.select().from(schema.matches).where(eq(schema.matches.tournamentId, tid));
+  const teams = await db.select().from(schema.teams).where(eq(schema.teams.tournamentId, tid));
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  return c.json({
+    data: rows.map((m) => ({
+      ...m,
+      team1Code: m.team1Id ? teamById.get(m.team1Id)?.code : null,
+      team2Code: m.team2Id ? teamById.get(m.team2Id)?.code : null,
+    })),
+  });
+});
+
+app.put("/api/admin/matches/:id", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{
+    team1Score?: number | null;
+    team2Score?: number | null;
+    team1Id?: number | null;
+    team2Id?: number | null;
+    team1Label?: string | null;
+    team2Label?: string | null;
+    ready?: boolean;
+  }>();
+  const db = c.var.db;
+  const mrows = await db.select().from(schema.matches).where(eq(schema.matches.id, id)).limit(1);
+  if (!mrows[0]) return c.json({ error: "Not found" }, 404);
+  const now = new Date().toISOString();
+  await db
+    .update(schema.matches)
+    .set({
+      team1Score: body.team1Score ?? mrows[0].team1Score,
+      team2Score: body.team2Score ?? mrows[0].team2Score,
+      team1Id: body.team1Id !== undefined ? body.team1Id : mrows[0].team1Id,
+      team2Id: body.team2Id !== undefined ? body.team2Id : mrows[0].team2Id,
+      team1Label: body.team1Label !== undefined ? body.team1Label : mrows[0].team1Label,
+      team2Label: body.team2Label !== undefined ? body.team2Label : mrows[0].team2Label,
+      ready: body.ready ?? mrows[0].ready,
+      updatedAt: now,
+    })
+    .where(eq(schema.matches.id, id));
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/matches/:id/recalculate-points", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const id = Number(c.req.param("id"));
+  await processMatchPoints(c.var.db, id);
+  return c.json({ ok: true });
+});
+
+app.post("/api/admin/matches/:id/toggle-lock", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  const mrows = await db.select().from(schema.matches).where(eq(schema.matches.id, id)).limit(1);
+  if (!mrows[0]) return c.json({ error: "Not found" }, 404);
+  const now = new Date().toISOString();
+  await db
+    .update(schema.matches)
+    .set({ isClosed: !mrows[0].isClosed, updatedAt: now })
+    .where(eq(schema.matches.id, id));
+  return c.json({ ok: true });
+});
+
+app.get("/api/admin/users", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const rows = await c.var.db
+    .select({
+      id: schema.users.id,
+      email: schema.users.email,
+      name: schema.users.name,
+      active: schema.users.active,
+      admin: schema.users.admin,
+    })
+    .from(schema.users)
+    .orderBy(asc(schema.users.name), asc(schema.users.email));
+  return c.json({ data: rows });
+});
+
+app.put("/api/admin/users/:id", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{ admin?: boolean; active?: boolean; name?: string }>();
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { updatedAt: now };
+  if (body.admin !== undefined) patch.admin = body.admin;
+  if (body.active !== undefined) patch.active = body.active;
+  if (body.name !== undefined) patch.name = body.name;
+  await c.var.db.update(schema.users).set(patch as typeof schema.users.$inferInsert).where(eq(schema.users.id, id));
+  return c.json({ ok: true });
+});
+
+app.get("/api/admin/leaderboards", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const rows = await c.var.db.select().from(schema.leaderboards).orderBy(asc(schema.leaderboards.name));
+  return c.json({ data: rows });
+});
+
+app.put("/api/admin/leaderboards/:id", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{ active?: boolean; private?: boolean }>();
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { updatedAt: now };
+  if (body.active !== undefined) patch.active = body.active;
+  if (body.private !== undefined) patch.private = body.private;
+  await c.var.db
+    .update(schema.leaderboards)
+    .set(patch as typeof schema.leaderboards.$inferInsert)
+    .where(eq(schema.leaderboards.id, id));
+  return c.json({ ok: true });
+});
+
+app.delete("/api/admin/leaderboards/:id", async (c) => {
+  const err = await requireAdmin(c);
+  if (err) return err;
+  const id = Number(c.req.param("id"));
+  await c.var.db.delete(schema.leaderboards).where(eq(schema.leaderboards.id, id));
+  return c.json({ ok: true });
+});
+
+/** Unknown /api/* — return JSON 404 (non-API routes are handled by assets + SPA, see wrangler `run_worker_first`). */
+app.notFound((c) => c.json({ error: "Not found" }, 404));
+
+export default app;

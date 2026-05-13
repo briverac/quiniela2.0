@@ -1,0 +1,4 @@
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+SESSION_SECRET=replace-with-long-random-string
+ADMIN_EMAILS=bryan.rivera@lognllc.com

@@ -1,0 +1,42 @@
+{
+  "name": "quiniela2.0",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && mkdir -p dist/quiniela2/migrations && cp migrations/*.sql dist/quiniela2/migrations/",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy --config dist/quiniela2/wrangler.json",
+    "check": "tsc --noEmit",
+    "db:generate-seed": "node scripts/build-seed.mjs",
+    "db:gen-wc26-yml": "node scripts/gen-wc26-from-sources.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply quiniela2 --local",
+    "db:migrate:remote": "wrangler d1 migrations apply quiniela2 --remote",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "arctic": "^3.7.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.18",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.15.0",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.36.4",
+    "@cloudflare/workers-types": "^4.20260511.1",
+    "@types/luxon": "^3.7.1",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "drizzle-kit": "^0.31.8",
+    "luxon": "^3.7.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.55.0",
+    "yaml": "^2.8.1"
+  }
+}
