@@ -60,14 +60,16 @@ Full-stack prediction pool (“quiniela”) for tournament **WC26** (FIFA World 
 | Command | Purpose |
 |--------|---------|
 | `npm run dev` | Vite dev + local Worker + D1 |
-| `npm run build` | Production client + worker bundle; copies SQL migrations into `dist/quiniela2/migrations/` |
-| `npm run deploy` | Build then `wrangler deploy --config dist/quiniela2/wrangler.json` |
+| `npm run build` | Production client + worker bundle; copies SQL migrations into `dist/mismo_quiniela/migrations/` |
+| `npm run deploy` | Build then `wrangler deploy --config dist/mismo_quiniela/wrangler.json` |
 | `npm run db:migrate:local` | Apply migrations to local D1 |
 | `npm run db:migrate:remote` | Apply migrations to **remote** D1 (needs valid `database_id`) |
 | `npm run db:generate-seed` | Regenerate `migrations/0002_seed.sql` from `data/wc26.yml` (override with `SEED_YAML=...`) |
 | `npm run db:gen-wc26-yml` | Rebuild `data/wc26.yml` from the Spanish Wikipedia annex markdown + Lima fixups |
 | `npm run test` | Vitest (scoring + match close rules) |
 | `npm run check` | TypeScript `tsc --noEmit` |
+
+**Worker Versions:** after `wrangler versions secret put`, deploy with the same config as prod, e.g. `npx wrangler versions deploy --config dist/mismo_quiniela/wrangler.json` (run `npm run build` first). Running `versions deploy` without `--config` can follow an old redirect to `dist/quiniela2/` and target a non-existent worker name.
 
 ## Troubleshooting: `Tournament not found`
 

@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && mkdir -p dist/quiniela2/migrations && cp migrations/*.sql dist/quiniela2/migrations/",
+    "build": "vite build && mkdir -p dist/mismo_quiniela/migrations && cp migrations/*.sql dist/mismo_quiniela/migrations/",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy --config dist/quiniela2/wrangler.json",
+    "deploy": "npm run build && wrangler deploy --config dist/mismo_quiniela/wrangler.json",
     "check": "tsc --noEmit",
     "db:generate-seed": "node scripts/build-seed.mjs",
     "db:gen-wc26-yml": "node scripts/gen-wc26-from-sources.mjs",
