@@ -3,6 +3,11 @@ import type { Db } from "../db/drizzle";
 import * as schema from "../db/schema";
 import { calculatePredictionPoints, sumPredictionPoints } from "../lib/points";
 import { matchClosed, validRealScores } from "../lib/matchLogic";
+import {
+  sortGroupTeamsByFifaRules,
+  type ClosedGroupMatch,
+  type GroupStandingRow,
+} from "../lib/groupStandingsSort";
 
 const TOURNAMENT_CODE = "WC26";
 
@@ -280,11 +285,12 @@ export async function groupStandings(db: Db, tournamentCode: string = TOURNAMENT
   if (!tid) return [];
 
   const phaseRows = await db
-    .select({ id: schema.phases.id })
+    .select({ id: schema.phases.id, code: schema.phases.code })
     .from(schema.phases)
     .where(and(eq(schema.phases.tournamentId, tid), eq(schema.phases.level, 1)));
 
   const phaseIds = phaseRows.map((p) => p.id);
+  const phaseIdToCode = new Map(phaseRows.map((p) => [p.id, p.code]));
   if (!phaseIds.length) return [];
 
   const teams = await db
@@ -298,13 +304,23 @@ export async function groupStandings(db: Db, tournamentCode: string = TOURNAMENT
     .where(and(eq(schema.matches.tournamentId, tid), inArray(schema.matches.phaseId, phaseIds)));
 
   const groupCodes = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
-  const result: {
-    code: string;
-    teams: ReturnType<typeof sortGroupTeams>;
-  }[] = [];
+  const result: { code: string; teams: GroupStandingRow[] }[] = [];
 
   for (const code of groupCodes) {
     const groupTeams = teams.filter((t) => t.group === code);
+    const closedGroupMatches: ClosedGroupMatch[] = [];
+    for (const m of allMatches) {
+      if (phaseIdToCode.get(m.phaseId) !== code) continue;
+      if (!matchClosed(m)) continue;
+      if (!validRealScores(m.team1Score, m.team2Score)) continue;
+      if (m.team1Id == null || m.team2Id == null) continue;
+      closedGroupMatches.push({
+        team1Id: m.team1Id,
+        team2Id: m.team2Id,
+        team1Score: m.team1Score!,
+        team2Score: m.team2Score!,
+      });
+    }
     const rows = groupTeams.map((team) => {
       let mp = 0,
         gf = 0,
@@ -352,6 +368,7 @@ export async function groupStandings(db: Db, tournamentCode: string = TOURNAMENT
         }
       }
       return {
+        id: team.id,
         code: team.code,
         matchesPlayed: mp,
         win: w,
@@ -363,27 +380,7 @@ export async function groupStandings(db: Db, tournamentCode: string = TOURNAMENT
         points: pts,
       };
     });
-    result.push({ code, teams: sortGroupTeams(rows) });
+    result.push({ code, teams: sortGroupTeamsByFifaRules(rows, closedGroupMatches) });
   }
   return result;
-}
-
-function sortGroupTeams(
-  rows: {
-    code: string;
-    matchesPlayed: number;
-    win: number;
-    draw: number;
-    lost: number;
-    goalInFavor: number;
-    goalAgainst: number;
-    goalDifference: number;
-    points: number;
-  }[]
-) {
-  return [...rows].sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-    return b.goalInFavor - a.goalInFavor;
-  });
 }
