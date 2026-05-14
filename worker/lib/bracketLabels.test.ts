@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildBracketLabelContext,
   resolveBracketLabel,
+  resolveBracketTeamCode,
+  matchTeamFlagCodes,
   thirdPlacePoolDescription,
 } from "./bracketLabels";
 
@@ -108,5 +110,79 @@ describe("resolveBracketLabel", () => {
 
   it("resolves 3-pool label to description", () => {
     expect(resolveBracketLabel("3ABCDF", emptyCtx)).toBe("3rd-place qualifier (A, B, C, D, F)");
+  });
+});
+
+describe("resolveBracketTeamCode", () => {
+  const emptyCtx = buildBracketLabelContext([], [], []);
+
+  it("returns null for third pool and unknown", () => {
+    expect(resolveBracketTeamCode("3ABCDF", emptyCtx)).toBeNull();
+    expect(resolveBracketTeamCode("W", emptyCtx)).toBeNull();
+  });
+
+  it("resolves W / L / 1 / 2 to team codes", () => {
+    const ctx = buildBracketLabelContext(
+      [
+        {
+          number: 90,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 2,
+          team2Score: 1,
+        },
+        {
+          number: 91,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 0,
+          team2Score: 1,
+        },
+      ],
+      [
+        { id: 1, code: "mex" },
+        { id: 2, code: "usa" },
+      ],
+      [{ code: "A", teams: [{ code: "mex" }, { code: "usa" }] }]
+    );
+    expect(resolveBracketTeamCode("W90", ctx)).toBe("mex");
+    expect(resolveBracketTeamCode("L91", ctx)).toBe("mex");
+    expect(resolveBracketTeamCode("1A", ctx)).toBe("mex");
+    expect(resolveBracketTeamCode("2A", ctx)).toBe("usa");
+  });
+
+  it("still returns group leader code when group has pending matches", () => {
+    const ctx = buildBracketLabelContext(
+      [],
+      [
+        { id: 1, code: "mex" },
+        { id: 2, code: "usa" },
+      ],
+      [{ code: "A", teams: [{ code: "mex" }, { code: "usa" }] }],
+      { groupsWithPendingMatches: new Set(["A"]) }
+    );
+    expect(resolveBracketTeamCode("1A", ctx)).toBe("mex");
+  });
+});
+
+describe("matchTeamFlagCodes", () => {
+  it("prefers team id assignment over label", () => {
+    const ctx = buildBracketLabelContext([], [], []);
+    const teamById = new Map([
+      [10, { code: "bra" }],
+      [20, { code: "arg" }],
+    ]);
+    const fc = matchTeamFlagCodes(
+      {
+        team1Id: 10,
+        team2Id: null,
+        team1Label: "1A",
+        team2Label: "W90",
+      },
+      teamById,
+      ctx
+    );
+    expect(fc.team1FlagCode).toBe("bra");
+    expect(fc.team2FlagCode).toBeNull();
   });
 });

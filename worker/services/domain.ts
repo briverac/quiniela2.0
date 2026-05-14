@@ -3,6 +3,7 @@ import type { Db } from "../db/drizzle";
 import * as schema from "../db/schema";
 import { calculatePredictionPoints, sumPredictionPoints } from "../lib/points";
 import { matchClosed, validRealScores } from "../lib/matchLogic";
+import { buildBracketLabelContext } from "../lib/bracketLabels";
 import {
   sortGroupTeamsByFifaRules,
   type ClosedGroupMatch,
@@ -383,4 +384,41 @@ export async function groupStandings(db: Db, tournamentCode: string = TOURNAMENT
     result.push({ code, teams: sortGroupTeamsByFifaRules(rows, closedGroupMatches) });
   }
   return result;
+}
+
+/** Phases, teams, matches, standings, and bracket context for label/flag resolution (WC26). */
+export async function gatherBracketLabelPack(db: Db, tournamentCode: string) {
+  const tid = await getTournamentIdByCode(db, tournamentCode);
+  if (!tid) return null;
+
+  const phases = await db.select().from(schema.phases).where(eq(schema.phases.tournamentId, tid));
+  const teams = await db.select().from(schema.teams).where(eq(schema.teams.tournamentId, tid));
+  const matchRows = await db.select().from(schema.matches).where(eq(schema.matches.tournamentId, tid));
+  const standings = await groupStandings(db, tournamentCode);
+  const phaseById = new Map(phases.map((p) => [p.id, p]));
+
+  const groupsWithPendingMatches = new Set<string>();
+  for (const m of matchRows) {
+    const ph = phaseById.get(m.phaseId);
+    if (!ph || ph.level !== 1 || !/^[A-L]$/.test(ph.code)) continue;
+    if (!matchClosed(m) || !validRealScores(m.team1Score, m.team2Score)) {
+      groupsWithPendingMatches.add(ph.code);
+    }
+  }
+
+  const bracketCtx = buildBracketLabelContext(
+    matchRows.map((m) => ({
+      number: m.number,
+      team1Id: m.team1Id,
+      team2Id: m.team2Id,
+      team1Score: m.team1Score,
+      team2Score: m.team2Score,
+    })),
+    teams.map((t) => ({ id: t.id, code: t.code })),
+    standings,
+    { groupsWithPendingMatches }
+  );
+
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  return { tid, phases, teams, matchRows, standings, phaseById, bracketCtx, teamById };
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { apiJson } from "../api";
+import { TeamFlag } from "../components/TeamFlag";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 
 const ORDER_KEY = "quiniela_predictions_order";
@@ -10,6 +11,10 @@ type BootMatch = {
   date: string;
   phaseId: number;
   phaseName: string;
+  team1Code: string | null;
+  team2Code: string | null;
+  team1FlagCode: string | null;
+  team2FlagCode: string | null;
   team1Name: string | null;
   team2Name: string | null;
   closed: boolean;
@@ -94,7 +99,17 @@ function MatchPredictionRow({ m, pr, draft, setDraft, statsByMatchNumber, timeLa
         </td>
       )}
       <td>
-        <strong>{m.team1Name}</strong> vs <strong>{m.team2Name}</strong>
+        <span className="match-teams">
+          <span className="team-with-flag">
+            <TeamFlag code={m.team1FlagCode ?? m.team1Code} title={m.team1Name ?? undefined} />
+            <strong>{m.team1Name}</strong>
+          </span>
+          <span className="muted">vs</span>
+          <span className="team-with-flag">
+            <TeamFlag code={m.team2FlagCode ?? m.team2Code} title={m.team2Name ?? undefined} />
+            <strong>{m.team2Name}</strong>
+          </span>
+        </span>
         {m.closed && <span className="badge">Closed</span>}
       </td>
       <td>

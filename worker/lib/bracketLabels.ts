@@ -114,6 +114,72 @@ export function resolveBracketLabel(label: string | null | undefined, ctx: Brack
   return null;
 }
 
+/**
+ * Same rules as {@link resolveBracketLabel}, but returns the team `code` for flags
+ * (e.g. from W74 / 1A / 2B). Third-place pools (`3…`) have no single team → null.
+ */
+export function resolveBracketTeamCode(label: string | null | undefined, ctx: BracketLabelContext): string | null {
+  if (label == null || label === "") return null;
+  const trimmed = label.trim();
+
+  const w = trimmed.match(/^W(\d+)$/i);
+  if (w) {
+    const num = Number(w[1]);
+    const m = ctx.matchByNumber.get(num);
+    if (!m) return null;
+    const wid = winnerTeamId(m);
+    if (wid == null) return null;
+    return ctx.teamById.get(wid)?.code ?? null;
+  }
+
+  const l = trimmed.match(/^L(\d+)$/i);
+  if (l) {
+    const num = Number(l[1]);
+    const m = ctx.matchByNumber.get(num);
+    if (!m) return null;
+    const lid = loserTeamId(m);
+    if (lid == null) return null;
+    return ctx.teamById.get(lid)?.code ?? null;
+  }
+
+  const first = trimmed.match(/^1([A-L])$/i);
+  if (first) {
+    const g = first[1].toUpperCase();
+    const order = ctx.groupTeamOrder.get(g);
+    return order?.[0] ?? null;
+  }
+
+  const second = trimmed.match(/^2([A-L])$/i);
+  if (second) {
+    const g = second[1].toUpperCase();
+    const order = ctx.groupTeamOrder.get(g);
+    return order?.[1] ?? null;
+  }
+
+  const thirdPool = trimmed.match(/^3([A-L]+)$/i);
+  if (thirdPool) return null;
+
+  return null;
+}
+
+export function matchTeamFlagCodes(
+  m: {
+    team1Id: number | null;
+    team2Id: number | null;
+    team1Label: string | null;
+    team2Label: string | null;
+  },
+  teamById: Map<number, { code: string }>,
+  ctx: BracketLabelContext
+): { team1FlagCode: string | null; team2FlagCode: string | null } {
+  const t1c = m.team1Id ? (teamById.get(m.team1Id)?.code ?? null) : null;
+  const t2c = m.team2Id ? (teamById.get(m.team2Id)?.code ?? null) : null;
+  return {
+    team1FlagCode: t1c ?? resolveBracketTeamCode(m.team1Label, ctx),
+    team2FlagCode: t2c ?? resolveBracketTeamCode(m.team2Label, ctx),
+  };
+}
+
 export type BuildBracketLabelContextOpts = {
   groupsWithPendingMatches?: Set<string>;
 };

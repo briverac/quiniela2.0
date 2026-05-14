@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiJson } from "../../api";
+import { TeamFlag } from "../../components/TeamFlag";
 
 const TOURNAMENT = "WC26";
 
@@ -43,6 +44,8 @@ type Match = {
   team2Label: string | null;
   team1Code: string | null;
   team2Code: string | null;
+  team1FlagCode: string | null;
+  team2FlagCode: string | null;
   /** WC26 R32: FIFA 3… default for team2 when clearing a manual pick (from API). */
   defaultThirdTeam2Label: string | null;
   isClosed: boolean;
@@ -180,7 +183,14 @@ function AdminMatchRow({
     return code ?? lbl ?? "?";
   };
 
-  const label = `${sideLabel(1)} vs ${sideLabel(2)}`;
+  const sideDisplay = (side: 1 | 2) => {
+    const tid = side === 1 ? m.team1Id : m.team2Id;
+    if (tid != null) {
+      const name = teams.find((t) => t.id === tid)?.name;
+      if (name) return name;
+    }
+    return sideLabel(side);
+  };
 
   const sortedTeams = useMemo(() => [...teams].sort((a, b) => a.name.localeCompare(b.name)), [teams]);
 
@@ -190,7 +200,17 @@ function AdminMatchRow({
       <td>
         <div className="admin-match-teams">
           <div className="admin-match-side">
-            <span>{label}</span>
+            <div className="match-teams" style={{ marginBottom: "0.25rem" }}>
+              <span className="team-with-flag">
+                <TeamFlag code={m.team1FlagCode ?? m.team1Code} />
+                <span>{sideDisplay(1)}</span>
+              </span>
+              <span className="muted">vs</span>
+              <span className="team-with-flag">
+                <TeamFlag code={m.team2FlagCode ?? m.team2Code} />
+                <span>{sideDisplay(2)}</span>
+              </span>
+            </div>
             {m.isClosed && <span className="badge">Locked</span>}
             <div className="admin-slot-pickers">
               {!m.team1Code && isThirdPoolLabel(m.team1Label) && (

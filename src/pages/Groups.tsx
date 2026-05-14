@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiJson } from "../api";
+import { TeamFlag } from "../components/TeamFlag";
 
 const TOURNAMENT = "WC26";
 
@@ -23,6 +24,10 @@ type BootMatch = {
   number: number;
   date: string;
   phaseCode?: string | null;
+  team1Code: string | null;
+  team2Code: string | null;
+  team1FlagCode: string | null;
+  team2FlagCode: string | null;
   team1Name: string | null;
   team2Name: string | null;
   team1Score: number | null;
@@ -131,7 +136,12 @@ export default function Groups() {
             <tbody>
               {activeStand.teams.map((t) => (
                 <tr key={t.code}>
-                  <td>{t.name}</td>
+                  <td>
+                    <span className="team-with-flag">
+                      <TeamFlag code={t.code} title={t.name} />
+                      {t.name}
+                    </span>
+                  </td>
                   <td>{t.matchesPlayed}</td>
                   <td>{t.win}</td>
                   <td>{t.draw}</td>
@@ -165,7 +175,17 @@ export default function Groups() {
                   <td>{m.number}</td>
                   <td>{formatKickoff(m.date)}</td>
                   <td>
-                    <strong>{m.team1Name ?? "—"}</strong> vs <strong>{m.team2Name ?? "—"}</strong>
+                    <span className="match-teams">
+                      <span className="team-with-flag">
+                        <TeamFlag code={m.team1FlagCode ?? m.team1Code} title={m.team1Name ?? undefined} />
+                        <strong>{m.team1Name ?? "—"}</strong>
+                      </span>
+                      <span className="muted">vs</span>
+                      <span className="team-with-flag">
+                        <TeamFlag code={m.team2FlagCode ?? m.team2Code} title={m.team2Name ?? undefined} />
+                        <strong>{m.team2Name ?? "—"}</strong>
+                      </span>
+                    </span>
                     {m.closed && <span className="badge">Closed</span>}
                   </td>
                   <td>
