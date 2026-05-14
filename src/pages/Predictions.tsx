@@ -2,6 +2,32 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import { apiJson } from "../api";
 import { TeamFlag } from "../components/TeamFlag";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+import type { TooltipContentProps } from "recharts";
+
+function CrowdShareTooltip(props: TooltipContentProps) {
+  const { active, payload, label } = props;
+  if (!active || !payload?.length) return null;
+  const v = payload[0].value;
+  const n = Math.round(Number(v));
+  return (
+    <div
+      className="recharts-default-tooltip"
+      style={{
+        margin: 0,
+        padding: "8px 10px",
+        background: "#fff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 6,
+        boxShadow: "0 1px 3px rgb(0 0 0 / 0.1)",
+      }}
+    >
+      <p className="recharts-tooltip-label" style={{ margin: 0, fontWeight: 600, color: "#0f172a" }}>
+        {label}
+      </p>
+      <p style={{ margin: "4px 0 0", color: "#3b82f6", fontWeight: 500 }}>{n}%</p>
+    </div>
+  );
+}
 
 const ORDER_KEY = "quiniela_predictions_order";
 
@@ -142,8 +168,8 @@ function MatchPredictionRow({ m, pr, draft, setDraft, statsByMatchNumber, timeLa
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} height={36} />
             <YAxis hide domain={[0, 100]} />
-            <Tooltip />
-            <Bar dataKey="v" fill="#3b82f6" name="%" />
+            <Tooltip content={CrowdShareTooltip} cursor={{ fill: "rgb(15 23 42 / 0.04)" }} />
+            <Bar dataKey="v" fill="#3b82f6" />
           </BarChart>
         )}
       </td>
