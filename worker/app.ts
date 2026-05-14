@@ -20,8 +20,10 @@ import {
   positionBoard,
   groupStandings,
 } from "./services/domain";
-import { matchClosed, validPredictionScores } from "./lib/matchLogic";
+import { matchClosed, validPredictionScores, validRealScores } from "./lib/matchLogic";
 import { teamName, phaseName, tournamentName } from "./lib/i18n";
+import { buildBracketLabelContext, resolveBracketLabel } from "./lib/bracketLabels";
+import { defaultWc26ThirdTeam2Label } from "./lib/wc26ThirdSlotDefaults";
 
 const CA = "WC26";
 
@@ -225,9 +227,32 @@ app.get("/api/tournaments/:code/bootstrap", async (c) => {
   const phases = await db.select().from(schema.phases).where(eq(schema.phases.tournamentId, tid));
   const teams = await db.select().from(schema.teams).where(eq(schema.teams.tournamentId, tid));
   const matchRows = await db.select().from(schema.matches).where(eq(schema.matches.tournamentId, tid));
+  const standings = await groupStandings(db, code);
+  const phaseById = new Map(phases.map((p) => [p.id, p]));
+
+  const groupsWithPendingMatches = new Set<string>();
+  for (const m of matchRows) {
+    const ph = phaseById.get(m.phaseId);
+    if (!ph || ph.level !== 1 || !/^[A-L]$/.test(ph.code)) continue;
+    if (!matchClosed(m) || !validRealScores(m.team1Score, m.team2Score)) {
+      groupsWithPendingMatches.add(ph.code);
+    }
+  }
+
+  const bracketCtx = buildBracketLabelContext(
+    matchRows.map((m) => ({
+      number: m.number,
+      team1Id: m.team1Id,
+      team2Id: m.team2Id,
+      team1Score: m.team1Score,
+      team2Score: m.team2Score,
+    })),
+    teams.map((t) => ({ id: t.id, code: t.code })),
+    standings,
+    { groupsWithPendingMatches }
+  );
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
-  const phaseById = new Map(phases.map((p) => [p.id, p]));
 
   const matches = matchRows
     .map((m) => {
@@ -245,8 +270,8 @@ app.get("/api/tournaments/:code/bootstrap", async (c) => {
         team2Id: m.team2Id,
         team1Code: t1?.code ?? null,
         team2Code: t2?.code ?? null,
-        team1Name: t1 ? teamName(t1.code) : m.team1Label,
-        team2Name: t2 ? teamName(t2.code) : m.team2Label,
+        team1Name: t1 ? teamName(t1.code) : resolveBracketLabel(m.team1Label, bracketCtx) ?? m.team1Label,
+        team2Name: t2 ? teamName(t2.code) : resolveBracketLabel(m.team2Label, bracketCtx) ?? m.team2Label,
         team1Label: m.team1Label,
         team2Label: m.team2Label,
         team1Score: m.team1Score,
@@ -397,7 +422,7 @@ app.get("/api/matches/:id/stats", async (c) => {
 app.get("/api/groups/standings", async (c) => {
   const u = c.var.user;
   if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
-  const data = await groupStandings(c.var.db);
+  const data = await groupStandings(c.var.db, CA);
   return c.json({
     data: data.map((g) => ({
       code: g.code,
@@ -651,6 +676,7 @@ app.get("/api/admin/matches", async (c) => {
       ...m,
       team1Code: m.team1Id ? teamById.get(m.team1Id)?.code : null,
       team2Code: m.team2Id ? teamById.get(m.team2Id)?.code : null,
+      defaultThirdTeam2Label: defaultWc26ThirdTeam2Label(m.number),
     })),
   });
 });

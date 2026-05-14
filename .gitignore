@@ -18,3 +18,4 @@ dist
 *.local.sql
 .DS_Store
 *.log
+tmp-fifa-calendar.json

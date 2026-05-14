@@ -6,7 +6,7 @@ Full-stack prediction pool (“quiniela”) for tournament **WC26** (FIFA World 
 
 - **Frontend:** Vite, React 19, React Router, Recharts
 - **Backend:** Hono worker (see [`worker/app.ts`](worker/app.ts))
-- **Data:** Drizzle ORM + D1; schema in [`migrations/0001_initial.sql`](migrations/0001_initial.sql); seed from [`data/wc26.yml`](data/wc26.yml) via [`scripts/build-seed.mjs`](scripts/build-seed.mjs) → [`migrations/0002_seed.sql`](migrations/0002_seed.sql). Regenerate `wc26.yml` from Wikipedia + Hiraoka with [`scripts/gen-wc26-from-sources.mjs`](scripts/gen-wc26-from-sources.mjs) (`npm run db:gen-wc26-yml`, set `WC26_WIKI_MD` if the default path is wrong).
+- **Data:** Drizzle ORM + D1; schema in [`migrations/0001_initial.sql`](migrations/0001_initial.sql); seed from [`data/wc26.yml`](data/wc26.yml) via [`scripts/build-seed.mjs`](scripts/build-seed.mjs) → [`migrations/0002_seed.sql`](migrations/0002_seed.sql). Kickoff times in `wc26.yml` are checked against the **FIFA calendar API** (`npm run db:check-wc26-fifa`). You can still regenerate structure from Wikipedia + Hiraoka with [`scripts/gen-wc26-from-sources.mjs`](scripts/gen-wc26-from-sources.mjs) (`npm run db:gen-wc26-yml`, set `WC26_WIKI_MD` if the default path is wrong); then fix any time drift the check reports.
 
 ## Prerequisites
 
@@ -66,6 +66,7 @@ Full-stack prediction pool (“quiniela”) for tournament **WC26** (FIFA World 
 | `npm run db:migrate:remote` | Apply migrations to **remote** D1 (needs valid `database_id`) |
 | `npm run db:generate-seed` | Regenerate `migrations/0002_seed.sql` from `data/wc26.yml` (override with `SEED_YAML=...`) |
 | `npm run db:gen-wc26-yml` | Rebuild `data/wc26.yml` from the Spanish Wikipedia annex markdown + Lima fixups |
+| `npm run db:emit-date-migration -- migrations/0005_....sql` | Emite solo `UPDATE matches ... date` desde `data/wc26.yml` (tras `--`, ruta del `.sql` nuevo) |
 | `npm run test` | Vitest (scoring + match close rules) |
 | `npm run check` | TypeScript `tsc --noEmit` |
 
@@ -78,6 +79,29 @@ The worker resolves the tournament by **code in D1** (the app uses `WC26`). That
 **Fix:** run **`npm run db:migrate:local`** (or **`db:migrate:remote`** for production). Migration **`0003_wc26_reseed.sql`** runs after `0002`: it **`DELETE`s tournament `id = 1`** (CASCADE clears phases, teams, matches, and prediction data tied to that tournament) and re-inserts the WC26 fixture—the same rows as `0002`, so new installs get WC26 from `0002` and upgraded DBs get corrected by `0003`.
 
 `npm run db:generate-seed` regenerates both **`0002_seed.sql`** and **`0003_wc26_reseed.sql`** so they stay in sync. **Remote D1:** migration SQL must not use `BEGIN TRANSACTION` / `COMMIT` (Wrangler wraps each file; explicit transactions return error 7500).
+
+### Fixture ya migrado: solo cambian horarios en `wc26.yml`
+
+Wrangler **no vuelve a ejecutar** `0002` ni `0003` si ya corrieron. Para llevar fechas nuevas a una base con datos (pronósticos, etc.) sin borrar nada:
+
+1. Tras editar `data/wc26.yml`, genera una migración **nueva** solo de `UPDATE` (o usa la **`0004`** que ya viene en el repo si aún no la aplicaste):
+   ```bash
+   node scripts/emit-match-date-migration.mjs migrations/0005_wc26_match_dates.sql
+   ```
+   (sube el número si `0004` ya está aplicada en ese entorno.)
+
+2. Aplica migraciones:
+   ```bash
+   npm run db:migrate:local
+   # o
+   npm run db:migrate:remote
+   ```
+
+`0004_wc26_match_dates.sql` actualiza los **104** `matches.date` del torneo `WC26` por `number`; no toca marcadores ni pronósticos. Para generar la **siguiente** migración cuando `0004` ya esté aplicada:
+
+```bash
+npm run db:emit-date-migration -- migrations/0005_wc26_match_dates.sql
+```
 
 ## Remote D1 migrations
 

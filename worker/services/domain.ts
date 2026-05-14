@@ -275,8 +275,8 @@ export async function positionBoard(
 }
 
 /** Group standings — ported from Rails Groups/Group (phase level 1 only) */
-export async function groupStandings(db: Db) {
-  const tid = await getTournamentIdByCode(db, TOURNAMENT_CODE);
+export async function groupStandings(db: Db, tournamentCode: string = TOURNAMENT_CODE) {
+  const tid = await getTournamentIdByCode(db, tournamentCode);
   if (!tid) return [];
 
   const phaseRows = await db

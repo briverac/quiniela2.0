@@ -5,6 +5,11 @@
  *
  * Run: node scripts/gen-wc26-from-sources.mjs [path-to-wiki.md]
  * Default wiki path points at Cursor upload location.
+ *
+ * After regenerating from wiki, align kickoffs with FIFA (authoritative UTC):
+ *   npm run db:check-wc26-fifa
+ * If that fails, fix `date` fields in data/wc26.yml to match
+ * https://api.fifa.com/api/v3/calendar/matches?idseason=285023 (see scripts/check-wc26-times-fifa.mjs).
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

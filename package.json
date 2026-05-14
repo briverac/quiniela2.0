@@ -10,7 +10,9 @@
     "deploy": "npm run build && wrangler deploy --config dist/mismo_quiniela/wrangler.json",
     "check": "tsc --noEmit",
     "db:generate-seed": "node scripts/build-seed.mjs",
+    "db:emit-date-migration": "node scripts/emit-match-date-migration.mjs",
     "db:gen-wc26-yml": "node scripts/gen-wc26-from-sources.mjs",
+    "db:check-wc26-fifa": "node scripts/check-wc26-times-fifa.mjs",
     "db:migrate:local": "wrangler d1 migrations apply quiniela2 --local",
     "db:migrate:remote": "wrangler d1 migrations apply quiniela2 --remote",
     "test": "vitest run"

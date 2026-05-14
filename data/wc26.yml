@@ -271,11 +271,11 @@ matches:
     team1: aut
     team2: jor
     phase: J
-  - date: '2026-06-18T00:00:00Z'
+  - date: '2026-06-17T23:00:00Z'
     team1: gha
     team2: pan
     phase: L
-  - date: '2026-06-17T19:00:00Z'
+  - date: '2026-06-17T20:00:00Z'
     team1: eng
     team2: cro
     phase: L
@@ -303,7 +303,7 @@ matches:
     team1: mex
     team2: kor
     phase: A
-  - date: '2026-06-20T01:00:00Z'
+  - date: '2026-06-20T00:30:00Z'
     team1: bra
     team2: hai
     phase: C
@@ -311,7 +311,7 @@ matches:
     team1: sco
     team2: mar
     phase: C
-  - date: '2026-06-20T04:00:00Z'
+  - date: '2026-06-20T03:00:00Z'
     team1: tur
     team2: par
     phase: D
@@ -399,7 +399,7 @@ matches:
     team1: bih
     team2: qat
     phase: B
-  - date: '2026-06-25T03:00:00Z'
+  - date: '2026-06-25T01:00:00Z'
     team1: cze
     team2: mex
     phase: A
@@ -603,7 +603,7 @@ matches:
     team1_label: 'L101'
     team2_label: 'L102'
     phase: third_place
-  - date: '2026-07-19T17:00:00Z'
+  - date: '2026-07-19T19:00:00Z'
     team1_label: 'W101'
     team2_label: 'W102'
     phase: final

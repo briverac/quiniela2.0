@@ -266,3 +266,24 @@ a {
   flex-wrap: wrap;
   gap: 0.35rem;
 }
+
+.admin-match-teams {
+  max-width: 28rem;
+}
+
+.admin-match-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-slot-pickers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-team-select {
+  max-width: 100%;
+  font-size: 0.85rem;
+}
