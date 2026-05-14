@@ -73,7 +73,7 @@ export default function AdminMatches() {
 
   const thirdStats = useMemo(() => countThirdPoolSlots(rows), [rows]);
 
-  const saveScores = async (m: Match) => {
+  const saveScoresAndRecalc = async (m: Match) => {
     setErr(null);
     await apiJson(`/api/admin/matches/${m.id}`, {
       method: "PUT",
@@ -82,6 +82,7 @@ export default function AdminMatches() {
         team2Score: m.team2Score,
       },
     });
+    await apiJson(`/api/admin/matches/${m.id}/recalculate-points`, { method: "POST" });
     loadMatches();
   };
 
@@ -120,7 +121,7 @@ export default function AdminMatches() {
               key={m.id}
               m={m}
               teams={teams}
-              onSaveScores={saveScores}
+              onSaveScoresAndRecalc={saveScoresAndRecalc}
               onReload={loadMatches}
               onError={setErr}
             />
@@ -155,13 +156,13 @@ async function putSlotTeam(
 function AdminMatchRow({
   m,
   teams,
-  onSaveScores,
+  onSaveScoresAndRecalc,
   onReload,
   onError,
 }: {
   m: Match;
   teams: BootTeam[];
-  onSaveScores: (m: Match) => void;
+  onSaveScoresAndRecalc: (m: Match) => Promise<void>;
   onReload: () => void;
   onError: (s: string | null) => void;
 }) {
@@ -252,27 +253,18 @@ function AdminMatchRow({
         <button
           type="button"
           className="button small"
-          onClick={() => {
+          onClick={async () => {
             const a = s1 === "" ? null : Number(s1);
             const b = s2 === "" ? null : Number(s2);
-            onSaveScores({ ...m, team1Score: a, team2Score: b });
-          }}
-        >
-          Save scores
-        </button>
-        <button
-          type="button"
-          className="button small"
-          onClick={async () => {
             try {
-              await apiJson(`/api/admin/matches/${m.id}/recalculate-points`, { method: "POST" });
-              onReload();
+              onError(null);
+              await onSaveScoresAndRecalc({ ...m, team1Score: a, team2Score: b });
             } catch (e: unknown) {
               onError(e instanceof Error ? e.message : "err");
             }
           }}
         >
-          Recalc points
+          Save score & update points
         </button>
         <button
           type="button"
