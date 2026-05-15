@@ -312,3 +312,116 @@ a {
   max-width: 100%;
   font-size: 0.85rem;
 }
+
+/* Leaderboards — create mini-league */
+.create-mini-league {
+  max-width: 28rem;
+  margin-top: 1rem;
+  padding: 1.25rem 1.35rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+}
+
+.create-mini-league .field-label {
+  margin-bottom: 0.4rem;
+}
+
+.create-mini-league input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.create-mini-league input[type="text"]:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.2);
+}
+
+.create-mini-league .field-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.create-mini-league-private {
+  margin-top: 1.15rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.create-mini-league .checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.create-mini-league .checkbox-row input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.create-mini-league .checkbox-desc {
+  display: block;
+  font-weight: 400;
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.create-mini-league-actions {
+  margin-top: 1.25rem;
+}
+
+/* Shared form label (Leaderboards create, Manage, etc.) */
+.field-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+/* Manage — members & invites */
+.manage-section-lead {
+  margin-bottom: 1rem;
+}
+
+.manage-form select {
+  max-width: 22rem;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.manage-form select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.2);
+}
+
+.manage-hint {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.manage-form .subsection-title {
+  margin-top: 1.35rem;
+}
+
+.manage-form .subsection-title:first-of-type {
+  margin-top: 0.5rem;
+}

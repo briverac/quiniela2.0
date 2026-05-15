@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { eq, and, asc, inArray } from "drizzle-orm";
+import { eq, and, asc, inArray, count } from "drizzle-orm";
 import { Google, generateCodeVerifier, generateState } from "arctic";
 import { getDb } from "./db/drizzle";
 import * as schema from "./db/schema";
@@ -515,6 +515,19 @@ app.get("/api/leaderboards/manage", async (c) => {
   if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
   const db = c.var.db;
   const owned = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.ownerId, u.id));
+  const lbIds = owned.map((o) => o.id);
+  let countByLb = new Map<number, number>();
+  if (lbIds.length) {
+    const rows = await db
+      .select({
+        leaderboardId: schema.leaderboardsUsers.leaderboardId,
+        n: count(),
+      })
+      .from(schema.leaderboardsUsers)
+      .where(inArray(schema.leaderboardsUsers.leaderboardId, lbIds))
+      .groupBy(schema.leaderboardsUsers.leaderboardId);
+    countByLb = new Map(rows.map((r) => [r.leaderboardId, r.n]));
+  }
   const invs = await db
     .select({
       id: schema.invitations.id,
@@ -524,7 +537,18 @@ app.get("/api/leaderboards/manage", async (c) => {
     .from(schema.invitations)
     .innerJoin(schema.leaderboards, eq(schema.invitations.leaderboardId, schema.leaderboards.id))
     .where(eq(schema.invitations.userId, u.id));
-  return c.json({ data: { owned, invitations: invs } });
+  return c.json({
+    data: {
+      owned: owned.map((o) => ({
+        id: o.id,
+        name: o.name,
+        code: o.code,
+        private: o.private,
+        memberCount: countByLb.get(o.id) ?? 0,
+      })),
+      invitations: invs,
+    },
+  });
 });
 
 app.get("/api/leaderboards/:id/members", async (c) => {

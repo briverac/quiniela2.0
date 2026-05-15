@@ -94,10 +94,6 @@ export default function Groups() {
   return (
     <div className="page">
       <h1>Groups</h1>
-      <p className="muted">
-        Tab per group: standings (from finished matches with scores) and all group fixtures in date
-        order.
-      </p>
 
       <div className="tabs" role="tablist" aria-label="Groups">
         {standings.map((g) => (

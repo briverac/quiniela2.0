@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiJson } from "../api";
 
 type Board = {
@@ -84,21 +85,49 @@ export default function Leaderboards() {
 
       <section className="phase-block">
         <h2>Create mini-league</h2>
-        <form onSubmit={create} className="form-row">
-          <input
-            placeholder="Name (3–40 characters)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            minLength={3}
-            maxLength={40}
-            required
-          />
-          <label>
-            <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} /> Private
-          </label>
-          <button type="submit" className="button primary">
-            Create
-          </button>
+        <p className="muted" style={{ maxWidth: "40rem", lineHeight: 1.55 }}>
+          A mini-league is a <strong>private ranking</strong> for a group of friends on top of the same tournament
+          predictions. Everyone still competes in the general table; this extra table only lists people you add.
+          After creating it, go to <Link to="/manage">Manage</Link> to invite players and remove members.
+        </p>
+
+        <form onSubmit={create} className="create-mini-league">
+          <div>
+            <label htmlFor="mini-league-name" className="field-label">
+              Name
+            </label>
+            <input
+              id="mini-league-name"
+              type="text"
+              autoComplete="off"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              minLength={3}
+              maxLength={40}
+              required
+              placeholder="e.g. Office pool"
+            />
+            <p className="field-hint">Between 3 and 40 characters. Must be unique.</p>
+          </div>
+
+          <div className="create-mini-league-private">
+            <label className="checkbox-row">
+              <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />
+              <span>
+                <strong>Private</strong>
+                <span className="checkbox-desc">
+                  On by default. Everyone still joins only if you invite them from Manage; this marks the league as
+                  private in the system.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <div className="create-mini-league-actions">
+            <button type="submit" className="button primary">
+              Create mini-league
+            </button>
+          </div>
         </form>
       </section>
     </div>
