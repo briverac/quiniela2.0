@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiJson } from "../api";
-import SiteFooter from "../components/SiteFooter";
-
+import landingBg from "../images/landing.jpg";
 type Me = { user: { id: number } | null };
 
 export default function Login() {
@@ -15,16 +14,19 @@ export default function Login() {
   }, [nav]);
   const err = sp.get("error");
   return (
-    <div className="layout">
-      <div className="page center login-page">
-        <h1>Quiniela</h1>
-        <p className="muted">Prediction game — sign in with Google to play.</p>
-        {err && <p className="error">Could not sign in ({err}).</p>}
-        <a className="button primary" href="/api/auth/google">
-          Sign in with Google
-        </a>
+    <div className="login-layout">
+      <img src={landingBg} alt="" className="login-layout__bg" />
+      <div className="login-hotspot">
+        <h1 className="login-title">Quiniela</h1>
+        <div className="login-actions">
+          {err && <p className="login-error">Could not sign in ({err}).</p>}
+          <a className="button primary login-button" href="/api/auth/google">
+            Sign in with Google
+          </a>
+        </div>
+        <p className="login-credit">
+          Created by <span className="login-credit__name">Bryan Rivera</span> · © 2026
+        </p>
       </div>
-      <SiteFooter />
     </div>
-  );
-}
+  );}
