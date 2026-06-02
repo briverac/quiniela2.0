@@ -588,6 +588,60 @@ a {
   font-weight: 600;
 }
 
+.table-predictions .predictions-prediction {
+  width: 1%;
+  min-width: 6.5rem;
+  white-space: nowrap;
+}
+
+.pred-grade {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pred-grade__icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.pred-grade__pick {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.pred-grade__real {
+  font-weight: 600;
+  color: #0f172a;
+  text-decoration: none;
+}
+
+.pred-grade--exact {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.pred-grade--partial {
+  color: #ca8a04;
+}
+
+.pred-grade--partial .pred-grade__pick {
+  color: #ca8a04;
+}
+
+.pred-grade--miss {
+  color: #dc2626;
+}
+
+.pred-grade--miss .pred-grade__pick {
+  color: #dc2626;
+}
+
+.pred-grade--pending {
+  color: #64748b;
+}
+
 .table-predictions .predictions-pts {
   width: 1%;
   min-width: 2.5rem;
