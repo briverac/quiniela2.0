@@ -67,6 +67,8 @@ export const matches = sqliteTable("matches", {
   team2Id: integer("team2_id").references(() => teams.id),
   team1Score: integer("team1_score"),
   team2Score: integer("team2_score"),
+  team1PenScore: integer("team1_pen_score"),
+  team2PenScore: integer("team2_pen_score"),
   team1Label: text("team1_label"),
   team2Label: text("team2_label"),
   ready: integer("ready", { mode: "boolean" }).notNull().default(true),

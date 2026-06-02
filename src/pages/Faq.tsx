@@ -29,7 +29,11 @@ export default function Faq() {
       <p>Matches close automatically five minutes before kickoff.</p>
 
       <h3>Are penalties taken into consideration?</h3>
-      <p>No — only 90 minutes plus overtime if applicable. Penalties do not count.</p>
+      <p>
+        No — only 90 minutes plus overtime if applicable. Penalties do not count toward points. In
+        knockout matches we may show the shootout in parentheses (e.g. 1–1 (4–2)) so you can see who
+        advanced; that does not change how your prediction is scored.
+      </p>
 
       <h3>How do I win points?</h3>
       <p>

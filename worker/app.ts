@@ -21,7 +21,13 @@ import {
   groupStandings,
   gatherBracketLabelPack,
 } from "./services/domain";
-import { matchClosed, validPredictionScores, validRealScores } from "./lib/matchLogic";
+import {
+  matchClosed,
+  tie,
+  validateMatchScoresInput,
+  validPredictionScores,
+  validRealScores,
+} from "./lib/matchLogic";
 import { teamName, phaseName, tournamentName } from "./lib/i18n";
 import { resolveBracketLabel, matchTeamFlagCodes } from "./lib/bracketLabels";
 import { defaultWc26ThirdTeam2Label } from "./lib/wc26ThirdSlotDefaults";
@@ -252,6 +258,9 @@ app.get("/api/tournaments/:code/bootstrap", async (c) => {
         team2Label: m.team2Label,
         team1Score: m.team1Score,
         team2Score: m.team2Score,
+        team1PenScore: m.team1PenScore,
+        team2PenScore: m.team2PenScore,
+        phaseLevel: ph?.level ?? 1,
         isClosed: m.isClosed,
         closed: matchClosed(m),
         ready: m.ready,
@@ -729,16 +738,20 @@ app.get("/api/admin/matches", async (c) => {
   const db = c.var.db;
   const pack = await gatherBracketLabelPack(db, CA);
   if (!pack) return tournamentNotFound(c, CA);
-  const { matchRows, teamById, bracketCtx } = pack;
+  const { matchRows, teamById, bracketCtx, phaseById } = pack;
   return c.json({
-    data: matchRows.map((m) => ({
-      ...m,
-      team1Code: m.team1Id ? teamById.get(m.team1Id)?.code : null,
-      team2Code: m.team2Id ? teamById.get(m.team2Id)?.code : null,
-      ...matchTeamFlagCodes(m, teamById, bracketCtx),
-      defaultThirdTeam2Label: defaultWc26ThirdTeam2Label(m.number),
-      closed: matchClosed(m),
-    })),
+    data: matchRows.map((m) => {
+      const ph = phaseById.get(m.phaseId);
+      return {
+        ...m,
+        phaseLevel: ph?.level ?? 1,
+        team1Code: m.team1Id ? teamById.get(m.team1Id)?.code : null,
+        team2Code: m.team2Id ? teamById.get(m.team2Id)?.code : null,
+        ...matchTeamFlagCodes(m, teamById, bracketCtx),
+        defaultThirdTeam2Label: defaultWc26ThirdTeam2Label(m.number),
+        closed: matchClosed(m),
+      };
+    }),
   });
 });
 
@@ -749,6 +762,8 @@ app.put("/api/admin/matches/:id", async (c) => {
   const body = await c.req.json<{
     team1Score?: number | null;
     team2Score?: number | null;
+    team1PenScore?: number | null;
+    team2PenScore?: number | null;
     team1Id?: number | null;
     team2Id?: number | null;
     team1Label?: string | null;
@@ -758,33 +773,56 @@ app.put("/api/admin/matches/:id", async (c) => {
   const db = c.var.db;
   const mrows = await db.select().from(schema.matches).where(eq(schema.matches.id, id)).limit(1);
   if (!mrows[0]) return c.json({ error: "Not found" }, 404);
-  const team1Score = body.team1Score !== undefined ? body.team1Score : mrows[0].team1Score;
-  const team2Score = body.team2Score !== undefined ? body.team2Score : mrows[0].team2Score;
-  if (body.team1Score !== undefined || body.team2Score !== undefined) {
-    const s1Missing = team1Score == null;
-    const s2Missing = team2Score == null;
-    if (s1Missing !== s2Missing) {
-      return c.json({ error: "Enter both scores, or leave both empty to clear the result" }, 400);
+  const mrow = mrows[0];
+  const phRows = await db
+    .select({ level: schema.phases.level })
+    .from(schema.phases)
+    .where(eq(schema.phases.id, mrow.phaseId))
+    .limit(1);
+  const phaseLevel = phRows[0]?.level ?? 1;
+
+  let team1Score = body.team1Score !== undefined ? body.team1Score : mrow.team1Score;
+  let team2Score = body.team2Score !== undefined ? body.team2Score : mrow.team2Score;
+  let team1PenScore = body.team1PenScore !== undefined ? body.team1PenScore : mrow.team1PenScore;
+  let team2PenScore = body.team2PenScore !== undefined ? body.team2PenScore : mrow.team2PenScore;
+
+  const scoreFieldsTouched =
+    body.team1Score !== undefined ||
+    body.team2Score !== undefined ||
+    body.team1PenScore !== undefined ||
+    body.team2PenScore !== undefined;
+
+  if (scoreFieldsTouched) {
+    if (team1Score == null || team2Score == null) {
+      team1PenScore = null;
+      team2PenScore = null;
+    } else if (!tie(team1Score, team2Score)) {
+      team1PenScore = null;
+      team2PenScore = null;
     }
-    if (!s1Missing) {
-      const a = team1Score!;
-      const b = team2Score!;
-      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 99 || b < 0 || b > 99) {
-        return c.json({ error: "Scores must be integers from 0 to 99" }, 400);
-      }
-    }
+    const errMsg = validateMatchScoresInput({
+      team1Score,
+      team2Score,
+      team1PenScore,
+      team2PenScore,
+      phaseLevel,
+    });
+    if (errMsg) return c.json({ error: errMsg }, 400);
   }
+
   const now = new Date().toISOString();
   await db
     .update(schema.matches)
     .set({
       team1Score,
       team2Score,
-      team1Id: body.team1Id !== undefined ? body.team1Id : mrows[0].team1Id,
-      team2Id: body.team2Id !== undefined ? body.team2Id : mrows[0].team2Id,
-      team1Label: body.team1Label !== undefined ? body.team1Label : mrows[0].team1Label,
-      team2Label: body.team2Label !== undefined ? body.team2Label : mrows[0].team2Label,
-      ready: body.ready ?? mrows[0].ready,
+      team1PenScore,
+      team2PenScore,
+      team1Id: body.team1Id !== undefined ? body.team1Id : mrow.team1Id,
+      team2Id: body.team2Id !== undefined ? body.team2Id : mrow.team2Id,
+      team1Label: body.team1Label !== undefined ? body.team1Label : mrow.team1Label,
+      team2Label: body.team2Label !== undefined ? body.team2Label : mrow.team2Label,
+      ready: body.ready ?? mrow.ready,
       updatedAt: now,
     })
     .where(eq(schema.matches.id, id));

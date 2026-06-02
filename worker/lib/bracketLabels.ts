@@ -1,13 +1,17 @@
 import { teamName } from "./i18n";
-import { validRealScores, team1Win, team2Win } from "./matchLogic";
+import { matchWinnerSide, validRealScores } from "./matchLogic";
 
 /** Fields needed from `matches` rows for W/L resolution. */
 export type MatchForBracket = {
   number: number;
   team1Id: number | null;
   team2Id: number | null;
+  team1Label?: string | null;
+  team2Label?: string | null;
   team1Score: number | null;
   team2Score: number | null;
+  team1PenScore?: number | null;
+  team2PenScore?: number | null;
 };
 
 export type TeamForBracket = { id: number; code: string };
@@ -27,6 +31,7 @@ export function thirdPlacePoolDescription(letters: string): string {
 export type BracketLabelContext = {
   matchByNumber: Map<number, MatchForBracket>;
   teamById: Map<number, { code: string }>;
+  teamCodeToId: Map<string, number>;
   /** Group letter → team codes in table order (best first). */
   groupTeamOrder: Map<string, string[]>;
   /**
@@ -36,22 +41,31 @@ export type BracketLabelContext = {
   groupsWithPendingMatches: Set<string>;
 };
 
-function winnerTeamId(m: MatchForBracket): number | null {
-  if (!validRealScores(m.team1Score, m.team2Score)) return null;
-  const s1 = m.team1Score!;
-  const s2 = m.team2Score!;
-  if (team1Win(s1, s2)) return m.team1Id;
-  if (team2Win(s1, s2)) return m.team2Id;
-  return null;
+/** Team id for a slot: DB id, or resolve seed label (1F, W74, …) when R32 rows have null ids. */
+function teamIdForSide(
+  m: MatchForBracket,
+  side: "team1" | "team2",
+  ctx: BracketLabelContext
+): number | null {
+  const direct = side === "team1" ? m.team1Id : m.team2Id;
+  if (direct != null) return direct;
+  const label = side === "team1" ? m.team1Label : m.team2Label;
+  const code = resolveBracketTeamCode(label, ctx);
+  if (!code) return null;
+  return ctx.teamCodeToId.get(code) ?? null;
 }
 
-function loserTeamId(m: MatchForBracket): number | null {
+function winnerTeamId(m: MatchForBracket, ctx: BracketLabelContext): number | null {
+  const side = matchWinnerSide(m);
+  if (!side) return null;
+  return teamIdForSide(m, side, ctx);
+}
+
+function loserTeamId(m: MatchForBracket, ctx: BracketLabelContext): number | null {
   if (!validRealScores(m.team1Score, m.team2Score)) return null;
-  const s1 = m.team1Score!;
-  const s2 = m.team2Score!;
-  if (team1Win(s1, s2)) return m.team2Id;
-  if (team2Win(s1, s2)) return m.team1Id;
-  return null;
+  const side = matchWinnerSide(m);
+  if (!side) return null;
+  return teamIdForSide(m, side === "team1" ? "team2" : "team1", ctx);
 }
 
 /**
@@ -67,7 +81,7 @@ export function resolveBracketLabel(label: string | null | undefined, ctx: Brack
     const num = Number(w[1]);
     const m = ctx.matchByNumber.get(num);
     if (!m) return null;
-    const wid = winnerTeamId(m);
+    const wid = winnerTeamId(m, ctx);
     if (wid == null) return null;
     const t = ctx.teamById.get(wid);
     return t ? teamName(t.code) : null;
@@ -78,7 +92,7 @@ export function resolveBracketLabel(label: string | null | undefined, ctx: Brack
     const num = Number(l[1]);
     const m = ctx.matchByNumber.get(num);
     if (!m) return null;
-    const lid = loserTeamId(m);
+    const lid = loserTeamId(m, ctx);
     if (lid == null) return null;
     const t = ctx.teamById.get(lid);
     return t ? teamName(t.code) : null;
@@ -127,7 +141,7 @@ export function resolveBracketTeamCode(label: string | null | undefined, ctx: Br
     const num = Number(w[1]);
     const m = ctx.matchByNumber.get(num);
     if (!m) return null;
-    const wid = winnerTeamId(m);
+    const wid = winnerTeamId(m, ctx);
     if (wid == null) return null;
     return ctx.teamById.get(wid)?.code ?? null;
   }
@@ -137,7 +151,7 @@ export function resolveBracketTeamCode(label: string | null | undefined, ctx: Br
     const num = Number(l[1]);
     const m = ctx.matchByNumber.get(num);
     if (!m) return null;
-    const lid = loserTeamId(m);
+    const lid = loserTeamId(m, ctx);
     if (lid == null) return null;
     return ctx.teamById.get(lid)?.code ?? null;
   }
@@ -192,7 +206,8 @@ export function buildBracketLabelContext(
 ): BracketLabelContext {
   const matchByNumber = new Map(matches.map((m) => [m.number, m]));
   const teamById = new Map(teams.map((t) => [t.id, { code: t.code }]));
+  const teamCodeToId = new Map(teams.map((t) => [t.code, t.id]));
   const groupTeamOrder = new Map(groupStandings.map((g) => [g.code, g.teams.map((r) => r.code)]));
   const groupsWithPendingMatches = opts?.groupsWithPendingMatches ?? new Set<string>();
-  return { matchByNumber, teamById, groupTeamOrder, groupsWithPendingMatches };
+  return { matchByNumber, teamById, teamCodeToId, groupTeamOrder, groupsWithPendingMatches };
 }

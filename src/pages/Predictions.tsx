@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { apiJson } from "../api";
 import { TeamFlag } from "../components/TeamFlag";
 import { MatchPickStatus } from "../components/MatchPickStatus";
-import { team1Win, team2Win, tie } from "../../worker/lib/matchLogic";
+import { formatMatchResultDisplay, team1Win, team2Win, tie } from "../../worker/lib/matchLogic";
 import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
 
@@ -128,6 +128,8 @@ type BootMatch = {
   team2Name: string | null;
   team1Score: number | null;
   team2Score: number | null;
+  team1PenScore: number | null;
+  team2PenScore: number | null;
   isClosed: boolean;
   closed: boolean;
 };
@@ -301,7 +303,9 @@ function ClosedPredictionDisplay({
 }) {
   const grade = gradePrediction(pr, m);
   const pick = formatScoreLine(pr.score1, pr.score2) ?? "—";
-  const real = formatScoreLine(m.team1Score, m.team2Score);
+  const real =
+    formatMatchResultDisplay(m.team1Score, m.team2Score, m.team1PenScore, m.team2PenScore) ??
+    formatScoreLine(m.team1Score, m.team2Score);
 
   if (grade === "pending") {
     return <span className="pred-grade pred-grade--pending">{pick}</span>;

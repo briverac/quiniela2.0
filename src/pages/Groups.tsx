@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiJson } from "../api";
 import { TeamFlag } from "../components/TeamFlag";
 import { MatchPickStatus } from "../components/MatchPickStatus";
+import { formatMatchResultDisplay } from "../../worker/lib/matchLogic";
 
 const TOURNAMENT = "WC26";
 
@@ -33,6 +34,8 @@ type BootMatch = {
   team2Name: string | null;
   team1Score: number | null;
   team2Score: number | null;
+  team1PenScore: number | null;
+  team2PenScore: number | null;
   isClosed: boolean;
   closed: boolean;
 };
@@ -194,9 +197,10 @@ export default function Groups() {
                     </div>
                   </td>
                   <td>
-                    {m.team1Score != null && m.team2Score != null
-                      ? `${m.team1Score} – ${m.team2Score}`
-                      : "—"}
+                    {formatMatchResultDisplay(m.team1Score, m.team2Score, m.team1PenScore, m.team2PenScore) ??
+                      (m.team1Score != null && m.team2Score != null
+                        ? `${m.team1Score} – ${m.team2Score}`
+                        : "—")}
                   </td>
                 </tr>
               ))}

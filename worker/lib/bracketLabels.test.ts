@@ -69,6 +69,55 @@ describe("resolveBracketLabel", () => {
     expect(resolveBracketLabel("L101", ctx)).toBe("Brazil");
   });
 
+  it("resolves W75 from R32 labels without team ids (pen winner)", () => {
+    const ctx = buildBracketLabelContext(
+      [
+        {
+          number: 75,
+          team1Id: null,
+          team2Id: null,
+          team1Label: "1F",
+          team2Label: "2C",
+          team1Score: 3,
+          team2Score: 3,
+          team1PenScore: 1,
+          team2PenScore: 3,
+        },
+      ],
+      [
+        { id: 22, code: "jpn" },
+        { id: 11, code: "hai" },
+      ],
+      [
+        { code: "F", teams: [{ code: "jpn" }, { code: "tun" }] },
+        { code: "C", teams: [{ code: "bra" }, { code: "hai" }] },
+      ]
+    );
+    expect(resolveBracketLabel("W75", ctx)).toBe("Haiti");
+  });
+
+  it("resolves W from penalties when FT is tied", () => {
+    const ctx = buildBracketLabelContext(
+      [
+        {
+          number: 90,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 1,
+          team2Score: 1,
+          team1PenScore: 4,
+          team2PenScore: 2,
+        },
+      ],
+      [
+        { id: 1, code: "mex" },
+        { id: 2, code: "usa" },
+      ],
+      []
+    );
+    expect(resolveBracketLabel("W90", ctx)).toBe("Mexico");
+  });
+
   it("returns null for W when match not played", () => {
     const ctx = buildBracketLabelContext(
       [{ number: 90, team1Id: 1, team2Id: 2, team1Score: null, team2Score: null }],

@@ -41,6 +41,9 @@ type Match = {
   team2Id: number | null;
   team1Score: number | null;
   team2Score: number | null;
+  team1PenScore: number | null;
+  team2PenScore: number | null;
+  phaseLevel: number;
   team1Label: string | null;
   team2Label: string | null;
   team1Code: string | null;
@@ -86,6 +89,8 @@ export default function AdminMatches() {
       json: {
         team1Score: m.team1Score,
         team2Score: m.team2Score,
+        team1PenScore: m.team1PenScore,
+        team2PenScore: m.team2PenScore,
       },
     });
     await apiJson(`/api/admin/matches/${m.id}/recalculate-points`, { method: "POST" });
@@ -186,13 +191,37 @@ function AdminMatchRow({
   onReload: () => void;
   onError: (s: string | null) => void;
 }) {
+  const knockout = m.phaseLevel >= 2;
   const [s1, setS1] = useState(m.team1Score != null ? String(m.team1Score) : "");
   const [s2, setS2] = useState(m.team2Score != null ? String(m.team2Score) : "");
+  const [p1, setP1] = useState(m.team1PenScore != null ? String(m.team1PenScore) : "");
+  const [p2, setP2] = useState(m.team2PenScore != null ? String(m.team2PenScore) : "");
 
   useEffect(() => {
     setS1(m.team1Score != null ? String(m.team1Score) : "");
     setS2(m.team2Score != null ? String(m.team2Score) : "");
-  }, [m.id, m.team1Score, m.team2Score]);
+    setP1(m.team1PenScore != null ? String(m.team1PenScore) : "");
+    setP2(m.team2PenScore != null ? String(m.team2PenScore) : "");
+  }, [m.id, m.team1Score, m.team2Score, m.team1PenScore, m.team2PenScore]);
+
+  const parseScorePair = (
+    a: string,
+    b: string,
+    label: string
+  ): { ok: true; v1: number | null; v2: number | null } | { ok: false; msg: string } => {
+    const empty1 = a.trim() === "";
+    const empty2 = b.trim() === "";
+    if (empty1 !== empty2) {
+      return { ok: false, msg: `Enter both ${label}, or leave both empty.` };
+    }
+    if (empty1) return { ok: true, v1: null, v2: null };
+    const v1 = Number(a);
+    const v2 = Number(b);
+    if (!Number.isInteger(v1) || !Number.isInteger(v2) || v1 < 0 || v1 > 99 || v2 < 0 || v2 > 99) {
+      return { ok: false, msg: `${label} must be whole numbers from 0 to 99.` };
+    }
+    return { ok: true, v1, v2 };
+  };
 
   const sideLabel = (side: 1 | 2) => {
     const code = side === 1 ? m.team1Code : m.team2Code;
@@ -291,11 +320,53 @@ function AdminMatchRow({
         />
       </td>
       <td className="admin-score-cell">
-        <span className="admin-score-inputs">
-          <input className="score" value={s1} onChange={(e) => setS1(e.target.value)} />
-          <span className="muted">–</span>
-          <input className="score" value={s2} onChange={(e) => setS2(e.target.value)} />
-        </span>
+        <div className="admin-score-stack">
+          <span className="admin-score-inputs">
+            <input
+              className="score"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              name={`match-${m.number}-ft1`}
+              value={s1}
+              onChange={(e) => setS1(e.target.value)}
+            />
+            <span className="muted">–</span>
+            <input
+              className="score"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              name={`match-${m.number}-ft2`}
+              value={s2}
+              onChange={(e) => setS2(e.target.value)}
+            />
+          </span>
+          {knockout && (
+            <span className="admin-score-inputs admin-score-inputs--pen">
+              <span className="admin-score-pen-label">Pen</span>
+              <input
+                className="score score--pen"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                name={`match-${m.number}-pen1`}
+                value={p1}
+                onChange={(e) => setP1(e.target.value)}
+              />
+              <span className="muted">–</span>
+              <input
+                className="score score--pen"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                name={`match-${m.number}-pen2`}
+                value={p2}
+                onChange={(e) => setP2(e.target.value)}
+              />
+            </span>
+          )}
+        </div>
       </td>
       <td className="actions-cell">
         <div className="actions-cell__inner">
@@ -303,25 +374,39 @@ function AdminMatchRow({
           type="button"
           className="button small primary admin-save-btn"
           onClick={async () => {
-            const empty1 = s1.trim() === "";
-            const empty2 = s2.trim() === "";
-            if (empty1 !== empty2) {
-              onError("Enter both scores, or leave both empty to clear the result.");
+            const ft = parseScorePair(s1, s2, "scores");
+            if (!ft.ok) {
+              onError(ft.msg);
               return;
             }
-            let a: number | null = null;
-            let b: number | null = null;
-            if (!empty1) {
-              a = Number(s1);
-              b = Number(s2);
-              if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 99 || b < 0 || b > 99) {
-                onError("Scores must be whole numbers from 0 to 99.");
+            let pen1: number | null = null;
+            let pen2: number | null = null;
+            if (knockout) {
+              const pen = parseScorePair(p1, p2, "penalty scores");
+              if (!pen.ok) {
+                onError(pen.msg);
+                return;
+              }
+              pen1 = pen.v1;
+              pen2 = pen.v2;
+              if (pen1 != null && pen2 != null && pen1 === pen2) {
+                onError("Penalty shootout cannot end in a tie.");
+                return;
+              }
+              if (ft.v1 != null && ft.v2 != null && ft.v1 !== ft.v2 && (pen1 != null || pen2 != null)) {
+                onError("Penalty scores only apply when the match is tied after 90 minutes plus extra time.");
                 return;
               }
             }
             try {
               onError(null);
-              await onSaveScoresAndRecalc({ ...m, team1Score: a, team2Score: b });
+              await onSaveScoresAndRecalc({
+                ...m,
+                team1Score: ft.v1,
+                team2Score: ft.v2,
+                team1PenScore: knockout ? pen1 : null,
+                team2PenScore: knockout ? pen2 : null,
+              });
             } catch (e: unknown) {
               onError(e instanceof Error ? e.message : "err");
             }
@@ -337,7 +422,15 @@ function AdminMatchRow({
               onError(null);
               setS1("");
               setS2("");
-              await onSaveScoresAndRecalc({ ...m, team1Score: null, team2Score: null });
+              setP1("");
+              setP2("");
+              await onSaveScoresAndRecalc({
+                ...m,
+                team1Score: null,
+                team2Score: null,
+                team1PenScore: null,
+                team2PenScore: null,
+              });
             } catch (e: unknown) {
               onError(e instanceof Error ? e.message : "err");
             }

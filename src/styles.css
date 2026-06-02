@@ -708,10 +708,34 @@ a {
   padding-right: 1rem;
 }
 
+.table-admin-matches .admin-score-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .table-admin-matches .admin-score-inputs {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.table-admin-matches .admin-score-inputs--pen {
+  font-size: 0.85rem;
+}
+
+.table-admin-matches .admin-score-pen-label {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  min-width: 1.75rem;
+}
+
+.table-admin-matches .score--pen {
+  width: 2.25rem;
 }
 
 .table-admin-matches .actions-cell {
