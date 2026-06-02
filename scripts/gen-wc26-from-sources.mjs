@@ -57,7 +57,7 @@ const UTC_ZONE = {
   "UTC+0": "Etc/UTC",
 };
 
-/** When wiki cells are empty, use Hiraoka (hora Perú) for that calendar day. */
+/** When wiki cells are empty, use Hiraoka (Peru local time) for that calendar day. */
 const LIMA_FIXUP = {
   50: { day: 24, month: 6, hour: 17, min: 0 },
   52: { day: 24, month: 6, hour: 14, min: 0 },

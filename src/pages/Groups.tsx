@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiJson } from "../api";
 import { TeamFlag } from "../components/TeamFlag";
+import { MatchPickStatus } from "../components/MatchPickStatus";
 
 const TOURNAMENT = "WC26";
 
@@ -32,6 +33,7 @@ type BootMatch = {
   team2Name: string | null;
   team1Score: number | null;
   team2Score: number | null;
+  isClosed: boolean;
   closed: boolean;
 };
 
@@ -153,14 +155,19 @@ export default function Groups() {
         )}
 
         <h3 className="subsection-title">Matches</h3>
+        <p className="predictions-deadline-notice">
+          All matches close for predictions <strong>5 minutes before</strong> the scheduled kickoff.
+        </p>
         {groupMatches.length === 0 ? (
           <p className="muted">No group-stage matches for this group.</p>
         ) : (
-          <table className="table">
+          <div className="table-wrap">
+          <table className="table table-groups">
             <thead>
               <tr>
                 <th>#</th>
                 <th>When</th>
+                <th>Status</th>
                 <th>Match</th>
                 <th>Result</th>
               </tr>
@@ -170,8 +177,11 @@ export default function Groups() {
                 <tr key={m.id}>
                   <td>{m.number}</td>
                   <td>{formatKickoff(m.date)}</td>
-                  <td>
-                    <span className="match-teams">
+                  <td className="match-status-cell">
+                    <MatchPickStatus date={m.date} isClosed={m.isClosed} closed={m.closed} layout="stack" />
+                  </td>
+                  <td className="match-cell">
+                    <div className="match-teams">
                       <span className="team-with-flag">
                         <TeamFlag code={m.team1FlagCode ?? m.team1Code} title={m.team1Name ?? undefined} />
                         <strong>{m.team1Name ?? "—"}</strong>
@@ -181,8 +191,7 @@ export default function Groups() {
                         <TeamFlag code={m.team2FlagCode ?? m.team2Code} title={m.team2Name ?? undefined} />
                         <strong>{m.team2Name ?? "—"}</strong>
                       </span>
-                    </span>
-                    {m.closed && <span className="badge">Closed</span>}
+                    </div>
                   </td>
                   <td>
                     {m.team1Score != null && m.team2Score != null
@@ -193,6 +202,7 @@ export default function Groups() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

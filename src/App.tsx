@@ -10,6 +10,7 @@ import Groups from "./pages/Groups";
 import AdminMatches from "./pages/admin/AdminMatches";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminLeaderboards from "./pages/admin/AdminLeaderboards";
+import SiteFooter from "./components/SiteFooter";
 
 type Me = { user: { id: number; email: string; name: string | null; picture: string | null; admin: boolean } | null };
 
@@ -68,6 +69,7 @@ function Layout() {
       <main className="main">
         <Outlet context={{ user: me.user }} />
       </main>
+      <SiteFooter />
     </div>
   );
 }

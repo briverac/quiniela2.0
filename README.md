@@ -11,49 +11,75 @@ Full-stack prediction pool (“quiniela”) for tournament **WC26** (FIFA World 
 ## Prerequisites
 
 - Node 20+
-- A [Cloudflare](https://dash.cloudflare.com/) account (for D1 + Workers + deployment)
-- Google Cloud OAuth client (Web application) with authorized redirect URI:  
-  `https://<your-worker-host>/api/auth/google/callback`  
-  and for local dev with Vite:  
-  `http://localhost:5173/api/auth/google/callback` (or the port Vite prints)
+- A [Cloudflare](https://dash.cloudflare.com/) account
+- A [Google Cloud](https://console.cloud.google.com/) OAuth client (Web application) — redirect URIs in [Setup](#setup) below
 
-## Local setup
+## Setup
 
-1. Install dependencies:
+Production is **one Cloudflare Worker**: React static assets, `/api/*` on Hono, and D1 bound in [`wrangler.jsonc`](wrangler.jsonc). Local dev uses the same config via the Vite + Wrangler plugin (`npm run dev`).
+
+### One-time (shared by local and production)
+
+1. Clone the repo and install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Create a D1 database (once per Cloudflare account / name):
+2. Log in to Cloudflare:
+
+   ```bash
+   npx wrangler login
+   ```
+
+3. Create a D1 database (once per account):
 
    ```bash
    npx wrangler d1 create quiniela2
    ```
 
-   Put the returned `database_id` into [`wrangler.jsonc`](wrangler.jsonc) under `d1_databases[0].database_id` (replace the placeholder UUID).
+   Put the returned `database_id` into [`wrangler.jsonc`](wrangler.jsonc) → `d1_databases[0].database_id` (replace the placeholder UUID).
 
-3. Copy secrets for dev:
+4. Copy [`.dev.vars.example`](.dev.vars.example) to `.dev.vars` and fill in `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, and comma-separated `ADMIN_EMAILS`.
+
+5. In Google Cloud Console, add **Authorized redirect URIs** for sign-in. The app always uses `{origin}/api/auth/google/callback`:
+
+   | Environment | When you know the URL | Example |
+   |---------------|------------------------|---------|
+   | Local | After `npm run dev` | `http://localhost:5173/api/auth/google/callback` (or the port Vite prints) |
+   | Production | After the first `npm run deploy` | `https://<your-worker-host>/api/auth/google/callback` |
+
+### Local development
+
+```bash
+npm run db:migrate:local
+npm run dev
+```
+
+Open the URL Vite prints (usually `http://localhost:5173`). Secrets come from `.dev.vars` only; nothing is deployed to Cloudflare yet.
+
+### Production deploy
+
+```bash
+npm run db:migrate:remote
+npm run deploy
+```
+
+1. **`db:migrate:remote`** — schema and WC26 seed on your remote D1 (before or with the first deploy).
+2. **`npm run deploy`** — creates the Worker, uploads the app, prints the public URL.
+3. **Production secrets** — after the Worker exists:
 
    ```bash
-   cp .dev.vars.example .dev.vars
+   npx wrangler secret put GOOGLE_CLIENT_ID
+   npx wrangler secret put GOOGLE_CLIENT_SECRET
+   npx wrangler secret put SESSION_SECRET
+   npx wrangler secret put ADMIN_EMAILS
    ```
 
-   Fill in `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` (any long random string; reserved for future use), and comma-separated `ADMIN_EMAILS` for users who should receive `admin: true` on first Google login.
+   Or set them under **Workers & Pages** → your Worker → **Settings** → **Variables**.
 
-4. Apply migrations to the **local** D1 emulator:
-
-   ```bash
-   npm run db:migrate:local
-   ```
-
-5. Run the app (Cloudflare Vite plugin — Worker + D1 + static assets):
-
-   ```bash
-   npm run dev
-   ```
-
-   Open the printed URL (usually `http://localhost:5173`). Sign in with Google; a prediction set and empty predictions for all matches are created automatically.
+4. Add the **production** redirect URI in Google (see table above) if you have not already.
+5. Open the Worker URL and sign in with Google.
 
 ## Scripts
 
@@ -66,11 +92,19 @@ Full-stack prediction pool (“quiniela”) for tournament **WC26** (FIFA World 
 | `npm run db:migrate:remote` | Apply migrations to **remote** D1 (needs valid `database_id`) |
 | `npm run db:generate-seed` | Regenerate `migrations/0002_seed.sql` from `data/wc26.yml` (override with `SEED_YAML=...`) |
 | `npm run db:gen-wc26-yml` | Rebuild `data/wc26.yml` from the Spanish Wikipedia annex markdown + Lima fixups |
-| `npm run db:emit-date-migration -- migrations/0005_....sql` | Emite solo `UPDATE matches ... date` desde `data/wc26.yml` (tras `--`, ruta del `.sql` nuevo) |
+| `npm run db:emit-date-migration -- migrations/0005_....sql` | Emit `UPDATE matches ... date` only from `data/wc26.yml` (after `--`, path to the new `.sql` file) |
 | `npm run test` | Vitest (scoring + match close rules) |
 | `npm run check` | TypeScript `tsc --noEmit` |
 
-**Worker Versions:** after `wrangler versions secret put`, deploy with the same config as prod, e.g. `npx wrangler versions deploy --config dist/mismo_quiniela/wrangler.json` (run `npm run build` first). Running `versions deploy` without `--config` can follow an old redirect to `dist/quiniela2/` and target a non-existent worker name.
+### Advanced: Cloudflare Worker Versions
+
+Only if you use Cloudflare’s **Versions** workflow (`wrangler versions secret put` / `wrangler versions deploy`) instead of `npm run deploy`: run `npm run build` first, then deploy with the built config so the worker name and D1 binding match production:
+
+```bash
+npx wrangler versions deploy --config dist/mismo_quiniela/wrangler.json
+```
+
+The default documented path is `npm run deploy` (`wrangler deploy`).
 
 ## Troubleshooting: `Tournament not found`
 
@@ -80,42 +114,28 @@ The worker resolves the tournament by **code in D1** (the app uses `WC26`). That
 
 `npm run db:generate-seed` regenerates both **`0002_seed.sql`** and **`0003_wc26_reseed.sql`** so they stay in sync. **Remote D1:** migration SQL must not use `BEGIN TRANSACTION` / `COMMIT` (Wrangler wraps each file; explicit transactions return error 7500).
 
-### Fixture ya migrado: solo cambian horarios en `wc26.yml`
+### Fixture already migrated: only kickoff times changed in `wc26.yml`
 
-Wrangler **no vuelve a ejecutar** `0002` ni `0003` si ya corrieron. Para llevar fechas nuevas a una base con datos (pronósticos, etc.) sin borrar nada:
+Wrangler **does not re-run** `0002` or `0003` once they have been applied. To apply new dates to a database that already has data (predictions, etc.) without wiping it:
 
-1. Tras editar `data/wc26.yml`, genera una migración **nueva** solo de `UPDATE` (o usa la **`0004`** que ya viene en el repo si aún no la aplicaste):
+1. After editing `data/wc26.yml`, generate a **new** migration with `UPDATE` statements only (or use **`0004`** from the repo if you have not applied it yet):
    ```bash
    node scripts/emit-match-date-migration.mjs migrations/0005_wc26_match_dates.sql
    ```
-   (sube el número si `0004` ya está aplicada en ese entorno.)
+   (Bump the migration number if `0004` is already applied in that environment.)
 
-2. Aplica migraciones:
+2. Apply migrations:
    ```bash
    npm run db:migrate:local
-   # o
+   # or
    npm run db:migrate:remote
    ```
 
-`0004_wc26_match_dates.sql` actualiza los **104** `matches.date` del torneo `WC26` por `number`; no toca marcadores ni pronósticos. Para generar la **siguiente** migración cuando `0004` ya esté aplicada:
+`0004_wc26_match_dates.sql` updates all **104** `matches.date` values for tournament `WC26` by `number`; it does not change scores or predictions. To generate the **next** migration after `0004` is already applied:
 
 ```bash
 npm run db:emit-date-migration -- migrations/0005_wc26_match_dates.sql
 ```
-
-## Remote D1 migrations
-
-After `wrangler d1 create` and updating `database_id`, run:
-
-```bash
-npm run db:migrate:remote
-```
-
-Then configure the same secrets in the Cloudflare dashboard (Workers → Settings → Variables) or use `wrangler secret put`.
-
-## Google OAuth callback
-
-The app builds the redirect URI from the request origin (`/api/auth/google/callback`). Ensure your Google client allows exactly that origin + path for each environment (local and production).
 
 ## Features (parity with Rails)
 
@@ -127,6 +147,10 @@ The app builds the redirect URI from the request origin (`/api/auth/google/callb
 - FAQ (static copy + knockout phase points table from bootstrap)
 - Admin: matches, users, leaderboards
 
-## License
+## License & attribution
 
-Private / same as your monorepo preference.
+Copyright © Bryan Rivera. All rights reserved.
+
+This repository is not open-source by default. If you received this code from someone else, keep this notice and credit **Bryan Rivera** as the author of Quiniela 2.0 (including in forks, internal docs, or “about” pages if you ship a public instance).
+
+Tournament data and scripts may incorporate third-party sources (FIFA API, Wikipedia, etc.); those remain subject to their own terms.

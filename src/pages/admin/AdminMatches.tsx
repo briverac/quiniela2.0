@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiJson } from "../../api";
 import { TeamFlag } from "../../components/TeamFlag";
+import { MatchPickStatus } from "../../components/MatchPickStatus";
 
 const TOURNAMENT = "WC26";
 
@@ -48,7 +49,9 @@ type Match = {
   team2FlagCode: string | null;
   /** WC26 R32: FIFA 3… default for team2 when clearing a manual pick (from API). */
   defaultThirdTeam2Label: string | null;
+  date: string;
   isClosed: boolean;
+  closed: boolean;
   ready: boolean;
 };
 
@@ -109,11 +112,24 @@ export default function AdminMatches() {
         <Link to="/predictions">Predictions</Link>
       </p>
       {err && <p className="error">{err}</p>}
-      <table className="table">
+      <p className="predictions-deadline-notice">
+        Predictions close for players <strong>5 minutes before</strong> kickoff. Use <strong>Toggle lock</strong>{" "}
+        to lock or unlock a match manually.
+      </p>
+      <div className="table-wrap">
+      <table className="table table-admin-matches">
+        <colgroup>
+          <col className="col-num" />
+          <col className="col-teams" />
+          <col className="col-status" />
+          <col className="col-score" />
+          <col className="col-actions" />
+        </colgroup>
         <thead>
           <tr>
             <th>#</th>
             <th>Teams</th>
+            <th>Status</th>
             <th>Score</th>
             <th>Actions</th>
           </tr>
@@ -131,6 +147,7 @@ export default function AdminMatches() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -195,12 +212,12 @@ function AdminMatchRow({
   const sortedTeams = useMemo(() => [...teams].sort((a, b) => a.name.localeCompare(b.name)), [teams]);
 
   return (
-    <tr>
-      <td>{m.number}</td>
-      <td>
+    <tr className="admin-match-row">
+      <td className="admin-match-num">{m.number}</td>
+      <td className="admin-match-teams-cell">
         <div className="admin-match-teams">
           <div className="admin-match-side">
-            <div className="match-teams" style={{ marginBottom: "0.25rem" }}>
+            <div className="match-teams">
               <span className="team-with-flag">
                 <TeamFlag code={m.team1FlagCode ?? m.team1Code} />
                 <span>{sideDisplay(1)}</span>
@@ -211,7 +228,6 @@ function AdminMatchRow({
                 <span>{sideDisplay(2)}</span>
               </span>
             </div>
-            {m.isClosed && <span className="badge">Locked</span>}
             <div className="admin-slot-pickers">
               {!m.team1Code && isThirdPoolLabel(m.team1Label) && (
                 <label className="admin-slot">
@@ -265,17 +281,44 @@ function AdminMatchRow({
           </div>
         </div>
       </td>
-      <td>
-        <input className="score" value={s1} onChange={(e) => setS1(e.target.value)} /> –
-        <input className="score" value={s2} onChange={(e) => setS2(e.target.value)} />
+      <td className="match-status-cell">
+        <MatchPickStatus
+          mode="admin"
+          layout="compact"
+          date={m.date}
+          isClosed={m.isClosed}
+          closed={m.closed}
+        />
+      </td>
+      <td className="admin-score-cell">
+        <span className="admin-score-inputs">
+          <input className="score" value={s1} onChange={(e) => setS1(e.target.value)} />
+          <span className="muted">–</span>
+          <input className="score" value={s2} onChange={(e) => setS2(e.target.value)} />
+        </span>
       </td>
       <td className="actions-cell">
+        <div className="actions-cell__inner">
         <button
           type="button"
-          className="button small"
+          className="button small primary admin-save-btn"
           onClick={async () => {
-            const a = s1 === "" ? null : Number(s1);
-            const b = s2 === "" ? null : Number(s2);
+            const empty1 = s1.trim() === "";
+            const empty2 = s2.trim() === "";
+            if (empty1 !== empty2) {
+              onError("Enter both scores, or leave both empty to clear the result.");
+              return;
+            }
+            let a: number | null = null;
+            let b: number | null = null;
+            if (!empty1) {
+              a = Number(s1);
+              b = Number(s2);
+              if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 99 || b < 0 || b > 99) {
+                onError("Scores must be whole numbers from 0 to 99.");
+                return;
+              }
+            }
             try {
               onError(null);
               await onSaveScoresAndRecalc({ ...m, team1Score: a, team2Score: b });
@@ -291,6 +334,22 @@ function AdminMatchRow({
           className="button small"
           onClick={async () => {
             try {
+              onError(null);
+              setS1("");
+              setS2("");
+              await onSaveScoresAndRecalc({ ...m, team1Score: null, team2Score: null });
+            } catch (e: unknown) {
+              onError(e instanceof Error ? e.message : "err");
+            }
+          }}
+        >
+          Clear score
+        </button>
+        <button
+          type="button"
+          className="button small"
+          onClick={async () => {
+            try {
               await apiJson(`/api/admin/matches/${m.id}/toggle-lock`, { method: "POST" });
               onReload();
             } catch (e: unknown) {
@@ -300,6 +359,7 @@ function AdminMatchRow({
         >
           Toggle lock
         </button>
+        </div>
       </td>
     </tr>
   );

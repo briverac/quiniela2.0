@@ -1,16 +1,46 @@
 import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { apiJson } from "../api";
+
+type LayoutUser = {
+  id: number;
+  email: string;
+  name: string | null;
+  picture: string | null;
+  admin: boolean;
+};
 
 type ManageData = {
   data: {
     owned: { id: number; name: string; code: string; private: boolean; memberCount: number }[];
+    memberOf: { id: number; name: string }[];
     invitations: { id: number; leaderboardId: number; leaderboardName: string }[];
   };
 };
 
+type SentInvite = {
+  id: number;
+  createdAt: string;
+  user: { id: number; name: string | null; email: string };
+};
+
+function formatInviteDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return iso;
+  }
+}
+
 export default function Manage() {
+  const { user } = useOutletContext<{ user: LayoutUser }>();
   const [data, setData] = useState<ManageData["data"] | null>(null);
   const [members, setMembers] = useState<{ id: number; name: string | null; email: string }[]>([]);
+  const [membersOwnerId, setMembersOwnerId] = useState<number | null>(null);
+  const [membersLoadFailed, setMembersLoadFailed] = useState(false);
+  const [sentInvites, setSentInvites] = useState<SentInvite[]>([]);
   const [removeIds, setRemoveIds] = useState<number[]>([]);
   const [candidates, setCandidates] = useState<{ id: number; name: string | null; email: string }[]>([]);
   const [pickLb, setPickLb] = useState<number | null>(null);
@@ -38,27 +68,67 @@ export default function Manage() {
     if (!pickLb) {
       setCandidates([]);
       setMembers([]);
+      setMembersOwnerId(null);
+      setMembersLoadFailed(false);
+      setSentInvites([]);
       return;
     }
-    apiJson<{ data: { id: number; name: string | null; email: string }[] }>(
-      `/api/leaderboards/${pickLb}/invite-candidates`
-    )
-      .then((r) => setCandidates(r.data))
-      .catch(() => setCandidates([]));
-    apiJson<{ data: { id: number; name: string | null; email: string }[] }>(`/api/leaderboards/${pickLb}/members`)
-      .then((r) => setMembers(r.data))
-      .catch(() => setMembers([]));
+    let cancelled = false;
+    setMembersLoadFailed(false);
+    void (async () => {
+      const [candR, memR, sentR] = await Promise.allSettled([
+        apiJson<{ data: { id: number; name: string | null; email: string }[] }>(
+          `/api/leaderboards/${pickLb}/invite-candidates`
+        ),
+        apiJson<{ data: { id: number; name: string | null; email: string }[]; ownerId: number }>(
+          `/api/leaderboards/${pickLb}/members`
+        ),
+        apiJson<{ data: SentInvite[] }>(`/api/leaderboards/${pickLb}/sent-invitations`),
+      ]);
+      if (cancelled) return;
+      setCandidates(candR.status === "fulfilled" ? candR.value.data : []);
+      if (memR.status === "fulfilled") {
+        setMembers(memR.value.data);
+        setMembersOwnerId(memR.value.ownerId);
+        setMembersLoadFailed(false);
+      } else {
+        setMembers([]);
+        setMembersOwnerId(null);
+        setMembersLoadFailed(true);
+      }
+      setSentInvites(sentR.status === "fulfilled" ? sentR.value.data : []);
+    })();
     setRemoveIds([]);
+    return () => {
+      cancelled = true;
+    };
   }, [pickLb]);
 
+  const removableIds = removeIds.filter((id) => id !== user.id && id !== membersOwnerId);
+
   const removeMembers = async () => {
-    if (!pickLb || !removeIds.length) return;
+    if (!pickLb || !removableIds.length) return;
     await apiJson(`/api/leaderboards/${pickLb}/members/remove`, {
       method: "POST",
-      json: { userIds: removeIds },
+      json: { userIds: removableIds },
     });
     setRemoveIds([]);
+    const mem = await apiJson<{ data: { id: number; name: string | null; email: string }[]; ownerId: number }>(
+      `/api/leaderboards/${pickLb}/members`
+    );
+    setMembers(mem.data);
+    setMembersOwnerId(mem.ownerId);
     load();
+  };
+
+  const leaveLeague = async (id: number) => {
+    setErr(null);
+    try {
+      await apiJson(`/api/leaderboards/${id}/leave`, { method: "POST" });
+      load();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Error");
+    }
   };
 
   const invite = async (e: React.FormEvent) => {
@@ -72,6 +142,14 @@ export default function Manage() {
       });
       setPickUser("");
       load();
+      if (pickLb != null) {
+        try {
+          const sent = await apiJson<{ data: SentInvite[] }>(`/api/leaderboards/${pickLb}/sent-invitations`);
+          setSentInvites(sent.data);
+        } catch {
+          setSentInvites([]);
+        }
+      }
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Error");
     }
@@ -97,6 +175,9 @@ export default function Manage() {
 
       <section className="phase-block">
         <h2>Invitations for you</h2>
+        <p className="manage-hint" style={{ marginBottom: "0.75rem" }}>
+          When someone invites you to their mini-league, it shows up here until you accept or reject.
+        </p>
         {data.invitations.length === 0 && <p className="muted">No pending invitations.</p>}
         <ul>
           {data.invitations.map((i) => (
@@ -115,25 +196,21 @@ export default function Manage() {
 
       <section className="phase-block">
         <h2>Your mini-leagues</h2>
-        {data.owned.length === 0 ? (
-          <p className="muted">You don’t own any yet. Create one from Leaderboards.</p>
+        {data.owned.length === 0 && (data.memberOf?.length ?? 0) === 0 ? (
+          <p className="muted">You don’t own or belong to any yet. Create one from Leaderboards.</p>
         ) : (
           <ul>
             {data.owned.map((o) => (
               <li key={o.id}>
-                {o.name}
-                {o.memberCount > 1 ? (
-                  <>
-                    {" "}
-                    <button
-                      type="button"
-                      className="linkbtn"
-                      onClick={() => apiJson(`/api/leaderboards/${o.id}/leave`, { method: "POST" }).then(load)}
-                    >
-                      Leave (you only, league stays)
-                    </button>
-                  </>
-                ) : null}
+                {o.name} <span className="muted">(you own this)</span>
+              </li>
+            ))}
+            {(data.memberOf ?? []).map((o) => (
+              <li key={o.id}>
+                {o.name}{" "}
+                <button type="button" className="linkbtn" onClick={() => leaveLeague(o.id)}>
+                  Leave
+                </button>
               </li>
             ))}
           </ul>
@@ -169,34 +246,46 @@ export default function Manage() {
                   ))}
                 </select>
                 <p id="manage-pick-lb-hint" className="manage-hint">
-                  Which league you’re editing below. Changing this reloads the member list and the invite list.
+                  Which league you’re editing below. Changing this reloads members, the invite dropdown, and pending
+                  invites you sent.
                 </p>
               </div>
 
               <h3 className="subsection-title">Members {selectedBoard ? `— ${selectedBoard.name}` : ""}</h3>
-              {members.length === 0 ? (
-                <p className="muted">No members listed (or you’re not the owner).</p>
+              {membersLoadFailed ? (
+                <p className="error">Could not load members for this league.</p>
+              ) : members.length === 0 ? (
+                <p className="muted">No members yet.</p>
               ) : (
                 <ul>
-                  {members.map((m) => (
-                    <li key={m.id}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={removeIds.includes(m.id)}
-                          onChange={(e) =>
-                            setRemoveIds((prev) =>
-                              e.target.checked ? [...prev, m.id] : prev.filter((x) => x !== m.id)
-                            )
-                          }
-                        />{" "}
-                        {m.name ?? m.email}
-                      </label>
-                    </li>
-                  ))}
+                  {members.map((m) => {
+                    const isOwner = membersOwnerId != null && m.id === membersOwnerId;
+                    return (
+                      <li key={m.id}>
+                        {isOwner ? (
+                          <>
+                            {m.name ?? m.email} <span className="muted">(owner — can’t be removed)</span>
+                          </>
+                        ) : (
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={removeIds.includes(m.id)}
+                              onChange={(e) =>
+                                setRemoveIds((prev) =>
+                                  e.target.checked ? [...prev, m.id] : prev.filter((x) => x !== m.id)
+                                )
+                              }
+                            />{" "}
+                            {m.name ?? m.email}
+                          </label>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
-              {removeIds.length > 0 && (
+              {removableIds.length > 0 && (
                 <p>
                   <button type="button" className="button danger" onClick={removeMembers}>
                     Remove selected
@@ -232,6 +321,27 @@ export default function Manage() {
                   Send invitation
                 </button>
               </form>
+
+              <h3 className="subsection-title">Invites you sent (pending)</h3>
+              {sentInvites.length === 0 ? (
+                <p className="muted">No one is waiting on an invite for this league.</p>
+              ) : (
+                <ul className="manage-sent-invites">
+                  {sentInvites.map((s) => (
+                    <li key={s.id}>
+                      <strong>{s.user.name ?? s.user.email}</strong>
+                      {s.user.name && <span className="muted"> ({s.user.email})</span>}
+                      <span className="muted" style={{ marginLeft: "0.35rem", fontSize: "0.85rem" }}>
+                        — sent {formatInviteDate(s.createdAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p id="manage-sent-invites-hint" className="manage-hint">
+                These people were invited but haven’t accepted yet. They’ll disappear from this list when they accept
+                or decline.
+              </p>
             </div>
           </>
         )}

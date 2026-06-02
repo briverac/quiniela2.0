@@ -94,19 +94,29 @@ export async function processMatchPoints(db: Db, matchId: number) {
     .limit(1);
   const phaseRow = ph[0];
   if (!phaseRow) return;
-  if (!validRealScores(matchRow.team1Score, matchRow.team2Score)) return;
 
   const preds = await db
     .select()
     .from(schema.predictions)
     .where(eq(schema.predictions.matchId, matchId));
 
+  const now = new Date().toISOString();
+
+  if (!validRealScores(matchRow.team1Score, matchRow.team2Score)) {
+    for (const p of preds) {
+      await db
+        .update(schema.predictions)
+        .set({ points: null, updatedAt: now })
+        .where(eq(schema.predictions.id, p.id));
+    }
+    return;
+  }
+
   const phase = {
     smallPoints: phaseRow.smallPoints,
     bigPoints: phaseRow.bigPoints,
   };
 
-  const now = new Date().toISOString();
   for (const p of preds) {
     const pts = calculatePredictionPoints(
       { id: p.id, score1: p.score1, score2: p.score2 },

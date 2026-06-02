@@ -487,6 +487,11 @@ app.post("/api/leaderboards/:id/leave", async (c) => {
   if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
   const id = Number(c.req.param("id"));
   const db = c.var.db;
+  const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
+  if (!lb[0]) return c.json({ error: "Not found" }, 404);
+  if (lb[0].ownerId === u.id) {
+    return c.json({ error: "Owners cannot leave their own league" }, 400);
+  }
   await db
     .delete(schema.leaderboardsUsers)
     .where(and(eq(schema.leaderboardsUsers.leaderboardId, id), eq(schema.leaderboardsUsers.userId, u.id)));
@@ -537,6 +542,22 @@ app.get("/api/leaderboards/manage", async (c) => {
     .from(schema.invitations)
     .innerJoin(schema.leaderboards, eq(schema.invitations.leaderboardId, schema.leaderboards.id))
     .where(eq(schema.invitations.userId, u.id));
+
+  const memberRows = await db
+    .select({ leaderboardId: schema.leaderboardsUsers.leaderboardId })
+    .from(schema.leaderboardsUsers)
+    .where(eq(schema.leaderboardsUsers.userId, u.id));
+  const ownedIds = new Set(owned.map((o) => o.id));
+  const memberOnlyIds = [...new Set(memberRows.map((r) => r.leaderboardId))].filter((id) => !ownedIds.has(id));
+  let memberOf: { id: number; name: string }[] = [];
+  if (memberOnlyIds.length) {
+    const boards = await db
+      .select({ id: schema.leaderboards.id, name: schema.leaderboards.name })
+      .from(schema.leaderboards)
+      .where(inArray(schema.leaderboards.id, memberOnlyIds));
+    memberOf = boards.map((b) => ({ id: b.id, name: b.name }));
+  }
+
   return c.json({
     data: {
       owned: owned.map((o) => ({
@@ -546,6 +567,7 @@ app.get("/api/leaderboards/manage", async (c) => {
         private: o.private,
         memberCount: countByLb.get(o.id) ?? 0,
       })),
+      memberOf,
       invitations: invs,
     },
   });
@@ -558,16 +580,23 @@ app.get("/api/leaderboards/:id/members", async (c) => {
   const db = c.var.db;
   const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
   if (!lb[0] || lb[0].ownerId !== u.id) return c.json({ error: "Forbidden" }, 403);
+  const ownerId = lb[0].ownerId;
   const mids = await db
     .select({ userId: schema.leaderboardsUsers.userId })
     .from(schema.leaderboardsUsers)
     .where(eq(schema.leaderboardsUsers.leaderboardId, id));
-  if (!mids.length) return c.json({ data: [] });
+  let memberUserIds = mids.map((m) => m.userId);
+  if (!memberUserIds.includes(ownerId)) {
+    await db.insert(schema.leaderboardsUsers).values({ leaderboardId: id, userId: ownerId });
+    memberUserIds = [...memberUserIds, ownerId];
+  }
+  if (!memberUserIds.length) return c.json({ data: [], ownerId });
   const users = await db
     .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
     .from(schema.users)
-    .where(inArray(schema.users.id, mids.map((m) => m.userId)));
-  return c.json({ data: users });
+    .where(inArray(schema.users.id, memberUserIds));
+  users.sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email));
+  return c.json({ data: users, ownerId });
 });
 
 app.get("/api/leaderboards/:id/invite-candidates", async (c) => {
@@ -600,6 +629,38 @@ app.get("/api/leaderboards/:id/invite-candidates", async (c) => {
     .filter((x) => !memberIds.has(x.id) && !pendingIds.has(x.id) && x.id !== u.id)
     .map((x) => ({ id: x.id, name: x.name, email: x.email }));
   return c.json({ data: candidates });
+});
+
+/** Pending invites for this leaderboard (owner only): people invited but not yet accepted. */
+app.get("/api/leaderboards/:id/sent-invitations", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  const db = c.var.db;
+  const lb = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.id, id)).limit(1);
+  if (!lb[0] || lb[0].ownerId !== u.id) return c.json({ error: "Forbidden" }, 403);
+  const invs = await db
+    .select({
+      id: schema.invitations.id,
+      userId: schema.invitations.userId,
+      createdAt: schema.invitations.createdAt,
+    })
+    .from(schema.invitations)
+    .where(eq(schema.invitations.leaderboardId, id));
+  if (!invs.length) return c.json({ data: [] });
+  const userIds = [...new Set(invs.map((i) => i.userId))];
+  const users = await db
+    .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+    .from(schema.users)
+    .where(inArray(schema.users.id, userIds));
+  const byUser = new Map(users.map((row) => [row.id, row]));
+  return c.json({
+    data: invs.map((inv) => ({
+      id: inv.id,
+      createdAt: inv.createdAt,
+      user: byUser.get(inv.userId) ?? { id: inv.userId, name: null, email: "?" },
+    })),
+  });
 });
 
 app.post("/api/leaderboards/:id/invitations", async (c) => {
@@ -676,6 +737,7 @@ app.get("/api/admin/matches", async (c) => {
       team2Code: m.team2Id ? teamById.get(m.team2Id)?.code : null,
       ...matchTeamFlagCodes(m, teamById, bracketCtx),
       defaultThirdTeam2Label: defaultWc26ThirdTeam2Label(m.number),
+      closed: matchClosed(m),
     })),
   });
 });
@@ -696,12 +758,28 @@ app.put("/api/admin/matches/:id", async (c) => {
   const db = c.var.db;
   const mrows = await db.select().from(schema.matches).where(eq(schema.matches.id, id)).limit(1);
   if (!mrows[0]) return c.json({ error: "Not found" }, 404);
+  const team1Score = body.team1Score !== undefined ? body.team1Score : mrows[0].team1Score;
+  const team2Score = body.team2Score !== undefined ? body.team2Score : mrows[0].team2Score;
+  if (body.team1Score !== undefined || body.team2Score !== undefined) {
+    const s1Missing = team1Score == null;
+    const s2Missing = team2Score == null;
+    if (s1Missing !== s2Missing) {
+      return c.json({ error: "Enter both scores, or leave both empty to clear the result" }, 400);
+    }
+    if (!s1Missing) {
+      const a = team1Score!;
+      const b = team2Score!;
+      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 99 || b < 0 || b > 99) {
+        return c.json({ error: "Scores must be integers from 0 to 99" }, 400);
+      }
+    }
+  }
   const now = new Date().toISOString();
   await db
     .update(schema.matches)
     .set({
-      team1Score: body.team1Score ?? mrows[0].team1Score,
-      team2Score: body.team2Score ?? mrows[0].team2Score,
+      team1Score,
+      team2Score,
       team1Id: body.team1Id !== undefined ? body.team1Id : mrows[0].team1Id,
       team2Id: body.team2Id !== undefined ? body.team2Id : mrows[0].team2Id,
       team1Label: body.team1Label !== undefined ? body.team1Label : mrows[0].team1Label,
