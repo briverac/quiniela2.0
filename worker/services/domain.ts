@@ -109,30 +109,38 @@ export async function processMatchPoints(db: Db, matchId: number) {
         .set({ points: null, updatedAt: now })
         .where(eq(schema.predictions.id, p.id));
     }
-    return;
-  }
-
-  const phase = {
-    smallPoints: phaseRow.smallPoints,
-    bigPoints: phaseRow.bigPoints,
-  };
-
-  for (const p of preds) {
-    const pts = calculatePredictionPoints(
-      { id: p.id, score1: p.score1, score2: p.score2 },
-      {
-        id: matchRow.id,
-        team1Score: matchRow.team1Score,
-        team2Score: matchRow.team2Score,
-        isClosed: matchRow.isClosed,
-        date: matchRow.date,
-      },
-      phase
-    );
     await db
-      .update(schema.predictions)
-      .set({ points: pts, updatedAt: now })
-      .where(eq(schema.predictions.id, p.id));
+      .update(schema.matches)
+      .set({ ready: false, updatedAt: now })
+      .where(eq(schema.matches.id, matchId));
+  } else {
+    const phase = {
+      smallPoints: phaseRow.smallPoints,
+      bigPoints: phaseRow.bigPoints,
+    };
+
+    for (const p of preds) {
+      const pts = calculatePredictionPoints(
+        { id: p.id, score1: p.score1, score2: p.score2 },
+        {
+          id: matchRow.id,
+          team1Score: matchRow.team1Score,
+          team2Score: matchRow.team2Score,
+          isClosed: matchRow.isClosed,
+          date: matchRow.date,
+        },
+        phase
+      );
+      await db
+        .update(schema.predictions)
+        .set({ points: pts, updatedAt: now })
+        .where(eq(schema.predictions.id, p.id));
+    }
+
+    await db
+      .update(schema.matches)
+      .set({ ready: true, updatedAt: now })
+      .where(eq(schema.matches.id, matchId));
   }
 
   const tid = await getTournamentIdByCode(db, TOURNAMENT_CODE);
@@ -154,11 +162,6 @@ export async function processMatchPoints(db: Db, matchId: number) {
       .set({ points: total, updatedAt: now })
       .where(eq(schema.predictionSets.id, s.id));
   }
-
-  await db
-    .update(schema.matches)
-    .set({ ready: true, updatedAt: now })
-    .where(eq(schema.matches.id, matchId));
 }
 
 export async function buildStatsByMatchNumber(db: Db): Promise<
