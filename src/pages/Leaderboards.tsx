@@ -7,6 +7,7 @@ type Board = {
   picture: string | null;
   points: number;
   index: number;
+  predictionSetId: number;
 };
 
 type Data = {
@@ -63,7 +64,7 @@ export default function Leaderboards() {
               <td>{r.index}</td>
               <td>
                 {r.picture && <img src={r.picture} alt="" className="avatar sm" />}
-                {r.name}
+                <Link to={`/predictions/${r.predictionSetId}`}>{r.name}</Link>
               </td>
               <td>{r.points}</td>
             </tr>

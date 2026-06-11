@@ -223,6 +223,7 @@ export async function positionBoard(
     picture: string | null;
     points: number;
     index: number;
+    predictionSetId: number;
   }[]
 > {
   const tid = await getTournamentIdByCode(db, TOURNAMENT_CODE);
@@ -283,6 +284,7 @@ export async function positionBoard(
         picture: u?.picture ?? u?.image ?? null,
         points: s.points,
         index: orderPoints.indexOf(s.points) + 1,
+        predictionSetId: s.id,
       };
     })
   );
@@ -397,6 +399,52 @@ export async function groupStandings(db: Db, tournamentCode: string = TOURNAMENT
     result.push({ code, teams: sortGroupTeamsByFifaRules(rows, closedGroupMatches) });
   }
   return result;
+}
+
+/** Another player's predictions — only closed matches (same rule as legacy predictions#show). */
+export async function fetchPlayerPredictionSet(
+  db: Db,
+  predictionSetId: number,
+  tournamentCode: string = TOURNAMENT_CODE
+) {
+  const tid = await getTournamentIdByCode(db, tournamentCode);
+  if (!tid) return null;
+
+  const setRows = await db
+    .select()
+    .from(schema.predictionSets)
+    .where(and(eq(schema.predictionSets.id, predictionSetId), eq(schema.predictionSets.tournamentId, tid)))
+    .limit(1);
+  const set = setRows[0];
+  if (!set) return null;
+
+  const userRows = await db.select().from(schema.users).where(eq(schema.users.id, set.userId)).limit(1);
+  const user = userRows[0];
+  if (!user) return null;
+
+  const rows = await db
+    .select({
+      id: schema.predictions.id,
+      matchId: schema.predictions.matchId,
+      score1: schema.predictions.score1,
+      score2: schema.predictions.score2,
+      points: schema.predictions.points,
+      date: schema.matches.date,
+      isClosed: schema.matches.isClosed,
+    })
+    .from(schema.predictions)
+    .innerJoin(schema.matches, eq(schema.predictions.matchId, schema.matches.id))
+    .where(eq(schema.predictions.predictionSetId, set.id));
+
+  const predictions = rows
+    .filter((r) => matchClosed({ date: r.date, isClosed: r.isClosed, team1Score: null, team2Score: null }))
+    .map(({ id, matchId, score1, score2, points }) => ({ id, matchId, score1, score2, points }));
+
+  return {
+    user: { name: user.name ?? user.email, picture: user.picture ?? user.image ?? null },
+    predictionSet: { id: set.id, points: set.points },
+    predictions,
+  };
 }
 
 /** Phases, teams, matches, standings, and bracket context for label/flag resolution (WC26). */

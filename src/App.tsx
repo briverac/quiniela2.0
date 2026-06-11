@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { apiJson } from "./api";
 import Login from "./pages/Login";
 import Predictions from "./pages/Predictions";
+import PlayerPredictions from "./pages/PlayerPredictions";
 import Leaderboards from "./pages/Leaderboards";
 import Manage from "./pages/Manage";
 import Faq from "./pages/Faq";
@@ -81,6 +82,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/predictions" replace />} />
         <Route path="/predictions" element={<Predictions />} />
+        <Route path="/predictions/:id" element={<PlayerPredictions />} />
         <Route path="/leaderboards" element={<Leaderboards />} />
         <Route path="/manage" element={<Manage />} />
         <Route path="/faq" element={<Faq />} />

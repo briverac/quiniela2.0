@@ -20,6 +20,7 @@ import {
   positionBoard,
   groupStandings,
   gatherBracketLabelPack,
+  fetchPlayerPredictionSet,
 } from "./services/domain";
 import {
   matchClosed,
@@ -327,6 +328,17 @@ app.get("/api/predictions", async (c) => {
       statsByMatchNumber: stats,
     },
   });
+});
+
+app.get("/api/predictions/:id", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const id = Number(c.req.param("id"));
+  if (!Number.isFinite(id)) return c.json({ error: "Not found" }, 404);
+
+  const data = await fetchPlayerPredictionSet(c.var.db, id, CA);
+  if (!data) return c.json({ error: "Not found" }, 404);
+  return c.json({ data });
 });
 
 app.put("/api/predictions", async (c) => {
