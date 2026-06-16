@@ -34,6 +34,42 @@ function countThirdPoolSlots(matches: Match[]): { sides: number; labels: string[
   return { sides, labels: [...set].sort() };
 }
 
+/** What still needs admin input — used for sort order (most urgent first). */
+function adminMatchAttention(m: Match): { priority: number; dateMs: number } {
+  const dateMs = new Date(m.date).getTime();
+  const knockout = m.phaseLevel >= 2;
+
+  const missingScore = m.closed && (m.team1Score == null || m.team2Score == null);
+  if (missingScore) return { priority: 0, dateMs };
+
+  const missingPen =
+    knockout &&
+    m.team1Score != null &&
+    m.team2Score != null &&
+    m.team1Score === m.team2Score &&
+    (m.team1PenScore == null || m.team2PenScore == null);
+  if (missingPen) return { priority: 1, dateMs };
+
+  const needsThirdPick =
+    (!m.team1Code && isThirdPoolLabel(m.team1Label) && m.team1Id == null) ||
+    (!m.team2Code && isThirdPoolLabel(m.team2Label) && m.team2Id == null);
+  if (needsThirdPick) return { priority: 2, dateMs };
+
+  return { priority: 3, dateMs };
+}
+
+function compareAdminMatches(a: Match, b: Match): number {
+  const aa = adminMatchAttention(a);
+  const bb = adminMatchAttention(b);
+  if (aa.priority !== bb.priority) return aa.priority - bb.priority;
+  if (aa.priority < 3) return aa.dateMs - bb.dateMs;
+  return a.number - b.number;
+}
+
+function adminMatchNeedsAttention(m: Match): boolean {
+  return adminMatchAttention(m).priority < 3;
+}
+
 type Match = {
   id: number;
   number: number;
@@ -82,6 +118,9 @@ export default function AdminMatches() {
 
   const thirdStats = useMemo(() => countThirdPoolSlots(rows), [rows]);
 
+  const sortedRows = useMemo(() => [...rows].sort(compareAdminMatches), [rows]);
+  const needsAttentionCount = useMemo(() => sortedRows.filter(adminMatchNeedsAttention).length, [sortedRows]);
+
   const saveScoresAndRecalc = async (m: Match) => {
     setErr(null);
     await apiJson(`/api/admin/matches/${m.id}`, {
@@ -117,6 +156,13 @@ export default function AdminMatches() {
         <Link to="/predictions">Predictions</Link>
       </p>
       {err && <p className="error">{err}</p>}
+      {needsAttentionCount > 0 && (
+        <p className="predictions-deadline-notice">
+          <strong>{needsAttentionCount}</strong>{" "}
+          {needsAttentionCount === 1 ? "match still needs" : "matches still need"} scores, penalties, or
+          third-place picks — listed first below.
+        </p>
+      )}
       <p className="predictions-deadline-notice">
         Predictions close for players <strong>5 minutes before</strong> kickoff. Use <strong>Toggle lock</strong>{" "}
         to lock or unlock a match manually.
@@ -140,11 +186,12 @@ export default function AdminMatches() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((m) => (
+          {sortedRows.map((m) => (
             <AdminMatchRow
               key={m.id}
               m={m}
               teams={teams}
+              needsAttention={adminMatchNeedsAttention(m)}
               onSaveScoresAndRecalc={saveScoresAndRecalc}
               onReload={loadMatches}
               onError={setErr}
@@ -181,12 +228,14 @@ async function putSlotTeam(
 function AdminMatchRow({
   m,
   teams,
+  needsAttention,
   onSaveScoresAndRecalc,
   onReload,
   onError,
 }: {
   m: Match;
   teams: BootTeam[];
+  needsAttention: boolean;
   onSaveScoresAndRecalc: (m: Match) => Promise<void>;
   onReload: () => void;
   onError: (s: string | null) => void;
@@ -241,7 +290,7 @@ function AdminMatchRow({
   const sortedTeams = useMemo(() => [...teams].sort((a, b) => a.name.localeCompare(b.name)), [teams]);
 
   return (
-    <tr className="admin-match-row">
+    <tr className={`admin-match-row${needsAttention ? " admin-match-row--needs-attention" : ""}`}>
       <td className="admin-match-num">{m.number}</td>
       <td className="admin-match-teams-cell">
         <div className="admin-match-teams">

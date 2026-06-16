@@ -798,6 +798,14 @@ a {
   color: #64748b;
 }
 
+.table-admin-matches .admin-match-row--needs-attention {
+  background: #fffbeb;
+}
+
+.table-admin-matches .admin-match-row--needs-attention:hover {
+  background: #fef3c7;
+}
+
 .admin-match-teams {
   max-width: 28rem;
 }
