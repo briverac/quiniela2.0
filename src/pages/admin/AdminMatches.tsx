@@ -34,40 +34,31 @@ function countThirdPoolSlots(matches: Match[]): { sides: number; labels: string[
   return { sides, labels: [...set].sort() };
 }
 
-/** What still needs admin input — used for sort order (most urgent first). */
-function adminMatchAttention(m: Match): { priority: number; dateMs: number } {
-  const dateMs = new Date(m.date).getTime();
-  const knockout = m.phaseLevel >= 2;
-
+/** Sort: (1) closed missing results, (2) open, (3) closed complete — each by match #. */
+function adminMatchAttention(m: Match): { priority: number; number: number } {
   const missingScore = m.closed && (m.team1Score == null || m.team2Score == null);
-  if (missingScore) return { priority: 0, dateMs };
-
   const missingPen =
-    knockout &&
+    m.closed &&
+    m.phaseLevel >= 2 &&
     m.team1Score != null &&
     m.team2Score != null &&
     m.team1Score === m.team2Score &&
     (m.team1PenScore == null || m.team2PenScore == null);
-  if (missingPen) return { priority: 1, dateMs };
 
-  const needsThirdPick =
-    (!m.team1Code && isThirdPoolLabel(m.team1Label) && m.team1Id == null) ||
-    (!m.team2Code && isThirdPoolLabel(m.team2Label) && m.team2Id == null);
-  if (needsThirdPick) return { priority: 2, dateMs };
-
-  return { priority: 3, dateMs };
+  if (missingScore || missingPen) return { priority: 1, number: m.number };
+  if (!m.closed) return { priority: 2, number: m.number };
+  return { priority: 3, number: m.number };
 }
 
 function compareAdminMatches(a: Match, b: Match): number {
   const aa = adminMatchAttention(a);
   const bb = adminMatchAttention(b);
   if (aa.priority !== bb.priority) return aa.priority - bb.priority;
-  if (aa.priority < 3) return aa.dateMs - bb.dateMs;
-  return a.number - b.number;
+  return aa.number - bb.number;
 }
 
 function adminMatchNeedsAttention(m: Match): boolean {
-  return adminMatchAttention(m).priority < 3;
+  return adminMatchAttention(m).priority === 1;
 }
 
 type Match = {
@@ -159,8 +150,10 @@ export default function AdminMatches() {
       {needsAttentionCount > 0 && (
         <p className="predictions-deadline-notice">
           <strong>{needsAttentionCount}</strong>{" "}
-          {needsAttentionCount === 1 ? "match still needs" : "matches still need"} scores, penalties, or
-          third-place picks — listed first below.
+          {needsAttentionCount === 1
+            ? "match still needs a score or penalties"
+            : "matches still need scores or penalties"}{" "}
+          — listed first below.
         </p>
       )}
       <p className="predictions-deadline-notice">
