@@ -50,17 +50,17 @@ export default function BestThirds() {
   if (!rows) return <div className="page">Loading…</div>;
 
   return (
-    <div className="page">
+    <div className="page page-best-thirds">
       <p className="muted">
         <Link to="/groups">← Back to groups</Link>
       </p>
       <h1>Best third-place teams</h1>
-      <p className="muted" style={{ maxWidth: "42rem", lineHeight: 1.55 }}>
+      <p className="muted page-best-thirds-intro">
         The top two in each group advance automatically. Among the twelve third-placed sides, the{" "}
         <strong>best eight</strong> also reach the Round of 32. FIFA ranks them across all groups using
         only their <strong>full group record</strong> (not head-to-head within the group).
       </p>
-      <p className="predictions-deadline-notice">
+      <p className="predictions-deadline-notice page-best-thirds-intro">
         Tiebreakers modeled here: <strong>points</strong>, then <strong>goal difference</strong>, then{" "}
         <strong>goals scored</strong>. Fair play (cards) and FIFA ranking are not included — ties after
         goals may differ from the official table.
@@ -69,14 +69,14 @@ export default function BestThirds() {
       {annex && (
         <section className="phase-block">
           <h2 className="subsection-title">Round of 32 matchups</h2>
-          <p className="muted" style={{ maxWidth: "42rem", lineHeight: 1.55 }}>
+          <p className="muted page-best-thirds-intro">
             Given today&apos;s top eight third-placed groups (<code>{annex.combinationKey}</code>), FIFA
             Annex C fixes who plays whom — no draw. Each row is an R32 fixture: the{" "}
             <strong>group winner</strong> on the left (<code>1A</code>, <code>1E</code>, …) vs the{" "}
             <strong>third from the assigned group</strong> on the right (<code>3C</code>, <code>3D</code>, …).
             Names and flags are from current standings; the letters are the FIFA slots.
           </p>
-          <p className="muted" style={{ maxWidth: "42rem", lineHeight: 1.55 }}>
+          <p className="muted page-best-thirds-intro">
             A group may already be finished — the third can still drop out of the top eight if another
             third overtakes them. The ranking table below shows who would advance today.
           </p>

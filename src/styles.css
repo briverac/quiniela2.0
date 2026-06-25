@@ -249,6 +249,15 @@ a {
   margin-top: 2rem;
 }
 
+.page-best-thirds-intro {
+  line-height: 1.55;
+  margin-bottom: 0.75rem;
+}
+
+.page-best-thirds-intro:last-of-type {
+  margin-bottom: 1.25rem;
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -488,6 +497,11 @@ a {
   line-height: 1.5;
   color: #64748b;
   max-width: 42rem;
+}
+
+.page-best-thirds-intro,
+.predictions-deadline-notice.page-best-thirds-intro {
+  max-width: none;
 }
 
 .table-predictions .match-status-cell,
