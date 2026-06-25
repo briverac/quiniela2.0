@@ -91,6 +91,7 @@ export default function AdminMatches() {
   const [rows, setRows] = useState<Match[]>([]);
   const [teams, setTeams] = useState<BootTeam[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const loadMatches = () =>
     apiJson<{ data: Match[] }>("/api/admin/matches")
@@ -112,8 +113,9 @@ export default function AdminMatches() {
   const sortedRows = useMemo(() => [...rows].sort(compareAdminMatches), [rows]);
   const needsAttentionCount = useMemo(() => sortedRows.filter(adminMatchNeedsAttention).length, [sortedRows]);
 
-  const saveScoresAndRecalc = async (m: Match) => {
+  const saveScoresAndRecalc = async (m: Match, cleared = false) => {
     setErr(null);
+    setMsg(null);
     await apiJson(`/api/admin/matches/${m.id}`, {
       method: "PUT",
       json: {
@@ -125,6 +127,11 @@ export default function AdminMatches() {
     });
     await apiJson(`/api/admin/matches/${m.id}/recalculate-points`, { method: "POST" });
     loadMatches();
+    setMsg(
+      cleared
+        ? `Match #${m.number} score cleared — points updated!`
+        : `Match #${m.number} saved — points updated!`
+    );
   };
 
   if (err && !rows.length) return <div className="page error">{err}</div>;
@@ -146,6 +153,7 @@ export default function AdminMatches() {
         {" · "}
         <Link to="/predictions">Predictions</Link>
       </p>
+      {msg && <p className="ok">{msg}</p>}
       {err && <p className="error">{err}</p>}
       {needsAttentionCount > 0 && (
         <p className="predictions-deadline-notice">
@@ -229,7 +237,7 @@ function AdminMatchRow({
   m: Match;
   teams: BootTeam[];
   needsAttention: boolean;
-  onSaveScoresAndRecalc: (m: Match) => Promise<void>;
+  onSaveScoresAndRecalc: (m: Match, cleared?: boolean) => Promise<void>;
   onReload: () => void;
   onError: (s: string | null) => void;
 }) {
@@ -472,7 +480,7 @@ function AdminMatchRow({
                 team2Score: null,
                 team1PenScore: null,
                 team2PenScore: null,
-              });
+              }, true);
             } catch (e: unknown) {
               onError(e instanceof Error ? e.message : "err");
             }

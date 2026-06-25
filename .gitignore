@@ -14,6 +14,9 @@ dist
 .env.*
 !.env.example
 
+# Database backups (local exports)
+backups/
+
 # Misc
 *.local.sql
 .DS_Store

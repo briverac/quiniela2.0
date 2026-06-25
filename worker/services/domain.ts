@@ -1,7 +1,8 @@
 import { eq, and, inArray } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import type { Db } from "../db/drizzle";
 import * as schema from "../db/schema";
-import { calculatePredictionPoints, sumPredictionPoints } from "../lib/points";
+import { calculatePredictionPoints } from "../lib/points";
 import { matchClosed, validRealScores } from "../lib/matchLogic";
 import { buildBracketLabelContext } from "../lib/bracketLabels";
 import { rankBestThirdPlaceTeams } from "../lib/bestThirdPlace";
@@ -81,6 +82,16 @@ export async function ensurePredictionSet(db: Db, userId: number, tournamentId: 
   return set;
 }
 
+const D1_BATCH_SIZE = 100;
+
+async function runD1Batch(db: Db, statements: BatchItem<"sqlite">[]) {
+  for (let i = 0; i < statements.length; i += D1_BATCH_SIZE) {
+    const chunk = statements.slice(i, i + D1_BATCH_SIZE);
+    if (!chunk.length) continue;
+    await db.batch(chunk as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+  }
+}
+
 export async function processMatchPoints(db: Db, matchId: number) {
   const mrows = await db
     .select()
@@ -103,14 +114,13 @@ export async function processMatchPoints(db: Db, matchId: number) {
     .where(eq(schema.predictions.matchId, matchId));
 
   const now = new Date().toISOString();
+  const affectedSetIds = [...new Set(preds.map((p) => p.predictionSetId))];
 
   if (!validRealScores(matchRow.team1Score, matchRow.team2Score)) {
-    for (const p of preds) {
-      await db
-        .update(schema.predictions)
-        .set({ points: null, updatedAt: now })
-        .where(eq(schema.predictions.id, p.id));
-    }
+    await db
+      .update(schema.predictions)
+      .set({ points: null, updatedAt: now })
+      .where(eq(schema.predictions.matchId, matchId));
     await db
       .update(schema.matches)
       .set({ ready: false, updatedAt: now })
@@ -120,24 +130,26 @@ export async function processMatchPoints(db: Db, matchId: number) {
       smallPoints: phaseRow.smallPoints,
       bigPoints: phaseRow.bigPoints,
     };
+    const matchForCalc = {
+      id: matchRow.id,
+      team1Score: matchRow.team1Score,
+      team2Score: matchRow.team2Score,
+      isClosed: matchRow.isClosed,
+      date: matchRow.date,
+    };
 
-    for (const p of preds) {
+    const predictionUpdates = preds.map((p) => {
       const pts = calculatePredictionPoints(
         { id: p.id, score1: p.score1, score2: p.score2 },
-        {
-          id: matchRow.id,
-          team1Score: matchRow.team1Score,
-          team2Score: matchRow.team2Score,
-          isClosed: matchRow.isClosed,
-          date: matchRow.date,
-        },
+        matchForCalc,
         phase
       );
-      await db
+      return db
         .update(schema.predictions)
         .set({ points: pts, updatedAt: now })
         .where(eq(schema.predictions.id, p.id));
-    }
+    });
+    if (predictionUpdates.length) await runD1Batch(db, predictionUpdates);
 
     await db
       .update(schema.matches)
@@ -145,25 +157,31 @@ export async function processMatchPoints(db: Db, matchId: number) {
       .where(eq(schema.matches.id, matchId));
   }
 
-  const tid = await getTournamentIdByCode(db, TOURNAMENT_CODE);
-  if (!tid) return;
+  if (!affectedSetIds.length) return;
 
-  const sets = await db
-    .select()
-    .from(schema.predictionSets)
-    .where(eq(schema.predictionSets.tournamentId, tid));
+  const setPreds = await db
+    .select({
+      predictionSetId: schema.predictions.predictionSetId,
+      points: schema.predictions.points,
+    })
+    .from(schema.predictions)
+    .where(inArray(schema.predictions.predictionSetId, affectedSetIds));
 
-  for (const s of sets) {
-    const pr = await db
-      .select()
-      .from(schema.predictions)
-      .where(eq(schema.predictions.predictionSetId, s.id));
-    const total = sumPredictionPoints(pr.map((x) => ({ points: x.points })));
-    await db
+  const totalsBySet = new Map<number, number>(affectedSetIds.map((id) => [id, 0]));
+  for (const p of setPreds) {
+    totalsBySet.set(
+      p.predictionSetId,
+      (totalsBySet.get(p.predictionSetId) ?? 0) + (p.points ?? 0)
+    );
+  }
+
+  const setUpdates = [...totalsBySet.entries()].map(([setId, total]) =>
+    db
       .update(schema.predictionSets)
       .set({ points: total, updatedAt: now })
-      .where(eq(schema.predictionSets.id, s.id));
-  }
+      .where(eq(schema.predictionSets.id, setId))
+  );
+  if (setUpdates.length) await runD1Batch(db, setUpdates);
 }
 
 export async function buildStatsByMatchNumber(db: Db): Promise<
