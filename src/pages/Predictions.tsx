@@ -4,6 +4,8 @@ import { apiJson } from "../api";
 import { TeamFlag } from "../components/TeamFlag";
 import { MatchPickStatus } from "../components/MatchPickStatus";
 import { ClosedPredictionDisplay } from "../components/ClosedPredictionDisplay";
+import { TeamResultsHint } from "../components/TeamResultsHint";
+import { buildTeamResultsIndex, teamResultsForCode, type TeamResultsSummary } from "../lib/teamResultsSummary";
 import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
 
@@ -251,14 +253,27 @@ type RowProps = {
   setDraft: Dispatch<SetStateAction<Record<number, { s1: string; s2: string }>>>;
   onSaveRow: (predictionId: number) => void;
   statsByMatchNumber: PredRes["data"]["statsByMatchNumber"];
+  teamResults: Map<string, TeamResultsSummary>;
   /** When set, show Time + Phase columns after # (date view). */
   timeLabel?: string;
   phaseLabel?: string;
 };
 
-function MatchPredictionRow({ m, pr, draft, setDraft, onSaveRow, statsByMatchNumber, timeLabel, phaseLabel }: RowProps) {
+function MatchPredictionRow({
+  m,
+  pr,
+  draft,
+  setDraft,
+  onSaveRow,
+  statsByMatchNumber,
+  teamResults,
+  timeLabel,
+  phaseLabel,
+}: RowProps) {
   const d = draft[pr.id] ?? { s1: "", s2: "" };
   const st = statsByMatchNumber[m.number];
+  const team1Key = m.team1FlagCode ?? m.team1Code;
+  const team2Key = m.team2FlagCode ?? m.team2Code;
   const chartData: CrowdChartDatum[] = st
     ? [
         { name: m.team1Name ?? "1", v: Math.round(st.team1), fill: CROWD_SHARE_COLORS[0] },
@@ -277,13 +292,25 @@ function MatchPredictionRow({ m, pr, draft, setDraft, onSaveRow, statsByMatchNum
       <td className="match-cell">
         <div className="match-teams">
           <span className="team-with-flag">
-            <TeamFlag code={m.team1FlagCode ?? m.team1Code} title={m.team1Name ?? undefined} />
-            <strong>{m.team1Name}</strong>
+            <TeamFlag code={team1Key} title={m.team1Name ?? undefined} />
+            <TeamResultsHint
+              teamCode={team1Key}
+              teamName={m.team1Name}
+              summary={teamResultsForCode(teamResults, team1Key)}
+            >
+              <strong>{m.team1Name}</strong>
+            </TeamResultsHint>
           </span>
           <span className="muted">vs</span>
           <span className="team-with-flag">
-            <TeamFlag code={m.team2FlagCode ?? m.team2Code} title={m.team2Name ?? undefined} />
-            <strong>{m.team2Name}</strong>
+            <TeamFlag code={team2Key} title={m.team2Name ?? undefined} />
+            <TeamResultsHint
+              teamCode={team2Key}
+              teamName={m.team2Name}
+              summary={teamResultsForCode(teamResults, team2Key)}
+            >
+              <strong>{m.team2Name}</strong>
+            </TeamResultsHint>
           </span>
         </div>
       </td>
@@ -377,6 +404,11 @@ export default function Predictions() {
     }
     return buckets;
   }, [boot]);
+
+  const teamResults = useMemo(
+    () => buildTeamResultsIndex(boot?.matches ?? []),
+    [boot?.matches]
+  );
 
   const putPredictions = async (items: { predictionId: number; score1: number; score2: number }[]) => {
     if (!items.length) return;
@@ -505,6 +537,7 @@ export default function Predictions() {
                           setDraft={setDraft}
                           onSaveRow={(id) => void saveRow(id)}
                           statsByMatchNumber={pred.statsByMatchNumber}
+                          teamResults={teamResults}
                         />
                       );
                     })}
@@ -548,6 +581,7 @@ export default function Predictions() {
                           setDraft={setDraft}
                           onSaveRow={(id) => void saveRow(id)}
                           statsByMatchNumber={pred.statsByMatchNumber}
+                          teamResults={teamResults}
                           timeLabel={formatTime(m.date)}
                           phaseLabel={m.phaseName}
                         />

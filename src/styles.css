@@ -602,6 +602,94 @@ a {
   font-weight: 600;
 }
 
+.team-results-hint {
+  cursor: help;
+  border-bottom: 1px dotted rgb(100 116 139 / 0.55);
+}
+
+.team-results-hint:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.team-results-tooltip {
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 1.5rem));
+  padding: 0.5rem 0.65rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 0.14);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #334155;
+  pointer-events: none;
+}
+
+.team-results-tooltip__title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: #0f172a;
+}
+
+.team-results-tooltip__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.35rem;
+}
+
+.team-results-tooltip__score {
+  white-space: nowrap;
+}
+
+.team-results-tooltip__vs {
+  font-size: 0.6875rem;
+}
+
+.team-results-tooltip__opponent {
+  min-width: 0;
+}
+
+.team-results-tooltip__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-results-tooltip__list li + li {
+  margin-top: 0.2rem;
+}
+
+.team-results-tooltip__outcome {
+  display: inline-block;
+  min-width: 1rem;
+  font-weight: 700;
+  font-size: 0.6875rem;
+}
+
+.team-results-tooltip__outcome--w {
+  color: #15803d;
+}
+
+.team-results-tooltip__outcome--d {
+  color: #a16207;
+}
+
+.team-results-tooltip__outcome--l {
+  color: #b91c1c;
+}
+
+.team-results-tooltip__totals {
+  margin: 0.45rem 0 0;
+  padding-top: 0.35rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
 .table-predictions .predictions-prediction {
   width: 1%;
   min-width: 6.5rem;
