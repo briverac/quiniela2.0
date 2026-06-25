@@ -32,6 +32,8 @@ import {
 import { teamName, phaseName, tournamentName } from "./lib/i18n";
 import { resolveBracketLabel, matchTeamFlagCodes } from "./lib/bracketLabels";
 import { defaultWc26ThirdTeam2Label } from "./lib/wc26ThirdSlotDefaults";
+import { rankBestThirdPlaceTeams } from "./lib/bestThirdPlace";
+import { buildThirdPlaceTeamByWinner } from "./lib/thirdPlaceAnnexC";
 
 const CA = "WC26";
 
@@ -253,8 +255,8 @@ app.get("/api/tournaments/:code/bootstrap", async (c) => {
         team2Code: t2?.code ?? null,
         team1FlagCode: fc.team1FlagCode,
         team2FlagCode: fc.team2FlagCode,
-        team1Name: t1 ? teamName(t1.code) : resolveBracketLabel(m.team1Label, bracketCtx) ?? m.team1Label,
-        team2Name: t2 ? teamName(t2.code) : resolveBracketLabel(m.team2Label, bracketCtx) ?? m.team2Label,
+        team1Name: t1 ? teamName(t1.code) : resolveBracketLabel(m.team1Label, bracketCtx, m.team2Label) ?? m.team1Label,
+        team2Name: t2 ? teamName(t2.code) : resolveBracketLabel(m.team2Label, bracketCtx, m.team1Label) ?? m.team2Label,
         team1Label: m.team1Label,
         team2Label: m.team2Label,
         team1Score: m.team1Score,
@@ -428,6 +430,48 @@ app.get("/api/groups/standings", async (c) => {
         name: teamName(t.code),
       })),
     })),
+  });
+});
+
+app.get("/api/groups/best-thirds", async (c) => {
+  const u = c.var.user;
+  if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
+  const groups = await groupStandings(c.var.db, CA);
+  const ranked = rankBestThirdPlaceTeams(groups);
+  const qualified = ranked.filter((r) => r.qualified);
+  const annexBuilt =
+    qualified.length === 8 ? buildThirdPlaceTeamByWinner(groups, qualified.map((q) => q.groupCode)) : null;
+
+  return c.json({
+    data: ranked.map((t) => ({
+      ...t,
+      name: teamName(t.code),
+      r32Opponent: annexBuilt
+        ? (() => {
+            for (const [winner, thirdGroup] of Object.entries(annexBuilt.byWinner)) {
+              if (thirdGroup === t.groupCode) return `1${winner}`;
+            }
+            return null;
+          })()
+        : null,
+    })),
+    annex: annexBuilt
+      ? {
+          combinationKey: annexBuilt.annex.combinationKey,
+          slots: annexBuilt.annex.slots.map((s) => {
+            const stand = groups.find((g) => g.code === s.thirdGroup);
+            const third = stand?.teams[2];
+            return {
+              matchNumber: s.matchNumber,
+              winnerGroup: s.winnerGroup,
+              thirdGroup: s.thirdGroup,
+              opponentLabel: `1${s.winnerGroup}`,
+              thirdTeamCode: third?.code ?? null,
+              thirdTeamName: third ? teamName(third.code) : null,
+            };
+          }),
+        }
+      : null,
   });
 });
 

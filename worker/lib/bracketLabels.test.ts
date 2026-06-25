@@ -157,7 +157,25 @@ describe("resolveBracketLabel", () => {
     expect(resolveBracketLabel("2A", ctx)).toBe("United States (2A)");
   });
 
-  it("resolves 3-pool label to description", () => {
+  it("resolves 3 pool when Annex C is available", () => {
+    const ctx = buildBracketLabelContext([], [], [], {
+      thirdPlaceTeamByWinnerGroup: new Map([["E", "usa"]]),
+      thirdPlaceGroupByWinnerGroup: new Map([["E", "D"]]),
+    });
+    expect(resolveBracketLabel("3ABCDF", ctx, "1E")).toBe("United States");
+    expect(resolveBracketTeamCode("3ABCDF", ctx, "1E")).toBe("usa");
+  });
+
+  it("shows 3D suffix when third-place group still open", () => {
+    const ctx = buildBracketLabelContext([], [], [], {
+      groupsWithPendingMatches: new Set(["D"]),
+      thirdPlaceTeamByWinnerGroup: new Map([["E", "usa"]]),
+      thirdPlaceGroupByWinnerGroup: new Map([["E", "D"]]),
+    });
+    expect(resolveBracketLabel("3ABCDF", ctx, "1E")).toBe("United States (3D)");
+  });
+
+  it("resolves 3-pool label to description when Annex C unknown", () => {
     expect(resolveBracketLabel("3ABCDF", emptyCtx)).toBe("3rd-place qualifier (A, B, C, D, F)");
   });
 });

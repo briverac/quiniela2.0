@@ -806,6 +806,18 @@ a {
   background: #fef3c7;
 }
 
+.best-thirds-row--in {
+  background: #ecfdf5;
+}
+
+.best-thirds-row--in:hover {
+  background: #d1fae5;
+}
+
+.best-thirds-row--out {
+  opacity: 0.85;
+}
+
 .admin-match-teams {
   max-width: 28rem;
 }

@@ -4,6 +4,8 @@ import * as schema from "../db/schema";
 import { calculatePredictionPoints, sumPredictionPoints } from "../lib/points";
 import { matchClosed, validRealScores } from "../lib/matchLogic";
 import { buildBracketLabelContext } from "../lib/bracketLabels";
+import { rankBestThirdPlaceTeams } from "../lib/bestThirdPlace";
+import { buildThirdPlaceTeamByWinner } from "../lib/thirdPlaceAnnexC";
 import {
   sortGroupTeamsByFifaRules,
   type ClosedGroupMatch,
@@ -481,7 +483,23 @@ export async function gatherBracketLabelPack(db: Db, tournamentCode: string) {
     })),
     teams.map((t) => ({ id: t.id, code: t.code })),
     standings,
-    { groupsWithPendingMatches }
+    {
+      groupsWithPendingMatches,
+      thirdPlaceTeamByWinnerGroup: (() => {
+        const ranked = rankBestThirdPlaceTeams(standings);
+        const qualifiedGroups = ranked.filter((r) => r.qualified).map((r) => r.groupCode);
+        if (qualifiedGroups.length !== 8) return null;
+        return buildThirdPlaceTeamByWinner(standings, qualifiedGroups)?.teamByWinner ?? null;
+      })(),
+      thirdPlaceGroupByWinnerGroup: (() => {
+        const ranked = rankBestThirdPlaceTeams(standings);
+        const qualifiedGroups = ranked.filter((r) => r.qualified).map((r) => r.groupCode);
+        if (qualifiedGroups.length !== 8) return null;
+        const built = buildThirdPlaceTeamByWinner(standings, qualifiedGroups);
+        if (!built) return null;
+        return new Map(Object.entries(built.byWinner));
+      })(),
+    }
   );
 
   const teamById = new Map(teams.map((t) => [t.id, t]));

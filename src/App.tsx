@@ -8,6 +8,7 @@ import Leaderboards from "./pages/Leaderboards";
 import Manage from "./pages/Manage";
 import Faq from "./pages/Faq";
 import Groups from "./pages/Groups";
+import BestThirds from "./pages/BestThirds";
 import AdminMatches from "./pages/admin/AdminMatches";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminLeaderboards from "./pages/admin/AdminLeaderboards";
@@ -87,6 +88,7 @@ export default function App() {
         <Route path="/manage" element={<Manage />} />
         <Route path="/faq" element={<Faq />} />
         <Route path="/groups" element={<Groups />} />
+        <Route path="/groups/best-thirds" element={<BestThirds />} />
         <Route path="/admin/matches" element={<AdminMatches />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/leaderboards" element={<AdminLeaderboards />} />

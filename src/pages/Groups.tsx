@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiJson } from "../api";
 import { TeamFlag } from "../components/TeamFlag";
 import { MatchPickStatus } from "../components/MatchPickStatus";
@@ -99,6 +100,9 @@ export default function Groups() {
   return (
     <div className="page">
       <h1>Groups</h1>
+      <p className="muted">
+        <Link to="/groups/best-thirds">Best third-place teams →</Link>
+      </p>
 
       <div className="tabs" role="tablist" aria-label="Groups">
         {standings.map((g) => (

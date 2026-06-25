@@ -39,6 +39,10 @@ export type BracketLabelContext = {
    * While a group is pending, 1X/2X display shows "TeamName (1X)" so users know the slot is provisional.
    */
   groupsWithPendingMatches: Set<string>;
+  /** When Annex C is resolved: group-winner letter (A–L) → third-place team code for that R32 slot. */
+  thirdPlaceTeamByWinnerGroup: Map<string, string> | null;
+  /** Parallel map: winner group letter → third-place group letter (for `3D` suffix). */
+  thirdPlaceGroupByWinnerGroup: Map<string, string> | null;
 };
 
 /** Team id for a slot: DB id, or resolve seed label (1F, W74, …) when R32 rows have null ids. */
@@ -68,11 +72,55 @@ function loserTeamId(m: MatchForBracket, ctx: BracketLabelContext): number | nul
   return teamIdForSide(m, side === "team1" ? "team2" : "team1", ctx);
 }
 
+function winnerGroupFromLabel(label: string | null | undefined): string | null {
+  const m = label?.trim().match(/^1([A-L])$/i);
+  return m ? m[1]!.toUpperCase() : null;
+}
+
+function resolveThirdPoolTeamCode(
+  poolLabel: string | null | undefined,
+  otherLabel: string | null | undefined,
+  ctx: BracketLabelContext
+): string | null {
+  if (!poolLabel || !ctx.thirdPlaceTeamByWinnerGroup?.size) return null;
+  const winner = winnerGroupFromLabel(otherLabel);
+  if (!winner) return null;
+  return ctx.thirdPlaceTeamByWinnerGroup.get(winner) ?? null;
+}
+
+function resolveThirdPoolDisplay(
+  poolLabel: string | null | undefined,
+  otherLabel: string | null | undefined,
+  ctx: BracketLabelContext
+): string | null {
+  const winner = winnerGroupFromLabel(otherLabel);
+  const code =
+    winner && ctx.thirdPlaceTeamByWinnerGroup?.size
+      ? ctx.thirdPlaceTeamByWinnerGroup.get(winner)
+      : undefined;
+  if (code) {
+    const name = teamName(code);
+    const thirdGroup = winner ? ctx.thirdPlaceGroupByWinnerGroup?.get(winner) : undefined;
+    if (thirdGroup && ctx.groupsWithPendingMatches.has(thirdGroup)) {
+      return `${name} (3${thirdGroup})`;
+    }
+    return name;
+  }
+  const trimmed = poolLabel?.trim();
+  if (!trimmed) return null;
+  const thirdPool = trimmed.match(/^3([A-L]+)$/i);
+  if (thirdPool) return thirdPlacePoolDescription(thirdPool[1]);
+  return null;
+}
 /**
  * Resolve knockout seed labels (W74, L101, 1A, 2B, 3ABCDF) to a display string when possible.
- * Returns null to keep the raw DB label (e.g. W90 before match 90 has a result).
+ * Pass `otherSideLabel` when resolving a `3…` pool (the `1X` on the opposite side).
  */
-export function resolveBracketLabel(label: string | null | undefined, ctx: BracketLabelContext): string | null {
+export function resolveBracketLabel(
+  label: string | null | undefined,
+  ctx: BracketLabelContext,
+  otherSideLabel?: string | null
+): string | null {
   if (label == null || label === "") return null;
   const trimmed = label.trim();
 
@@ -122,7 +170,7 @@ export function resolveBracketLabel(label: string | null | undefined, ctx: Brack
 
   const thirdPool = trimmed.match(/^3([A-L]+)$/i);
   if (thirdPool) {
-    return thirdPlacePoolDescription(thirdPool[1]);
+    return resolveThirdPoolDisplay(trimmed, otherSideLabel, ctx);
   }
 
   return null;
@@ -130,9 +178,13 @@ export function resolveBracketLabel(label: string | null | undefined, ctx: Brack
 
 /**
  * Same rules as {@link resolveBracketLabel}, but returns the team `code` for flags
- * (e.g. from W74 / 1A / 2B). Third-place pools (`3…`) have no single team → null.
+ * (e.g. from W74 / 1A / 2B). Third-place pools (`3…`) need `otherSideLabel` (`1X`).
  */
-export function resolveBracketTeamCode(label: string | null | undefined, ctx: BracketLabelContext): string | null {
+export function resolveBracketTeamCode(
+  label: string | null | undefined,
+  ctx: BracketLabelContext,
+  otherSideLabel?: string | null
+): string | null {
   if (label == null || label === "") return null;
   const trimmed = label.trim();
 
@@ -171,7 +223,9 @@ export function resolveBracketTeamCode(label: string | null | undefined, ctx: Br
   }
 
   const thirdPool = trimmed.match(/^3([A-L]+)$/i);
-  if (thirdPool) return null;
+  if (thirdPool) {
+    return resolveThirdPoolTeamCode(trimmed, otherSideLabel, ctx);
+  }
 
   return null;
 }
@@ -189,13 +243,15 @@ export function matchTeamFlagCodes(
   const t1c = m.team1Id ? (teamById.get(m.team1Id)?.code ?? null) : null;
   const t2c = m.team2Id ? (teamById.get(m.team2Id)?.code ?? null) : null;
   return {
-    team1FlagCode: t1c ?? resolveBracketTeamCode(m.team1Label, ctx),
-    team2FlagCode: t2c ?? resolveBracketTeamCode(m.team2Label, ctx),
+    team1FlagCode: t1c ?? resolveBracketTeamCode(m.team1Label, ctx, m.team2Label),
+    team2FlagCode: t2c ?? resolveBracketTeamCode(m.team2Label, ctx, m.team1Label),
   };
 }
 
 export type BuildBracketLabelContextOpts = {
   groupsWithPendingMatches?: Set<string>;
+  thirdPlaceTeamByWinnerGroup?: Map<string, string> | null;
+  thirdPlaceGroupByWinnerGroup?: Map<string, string> | null;
 };
 
 export function buildBracketLabelContext(
@@ -209,5 +265,15 @@ export function buildBracketLabelContext(
   const teamCodeToId = new Map(teams.map((t) => [t.code, t.id]));
   const groupTeamOrder = new Map(groupStandings.map((g) => [g.code, g.teams.map((r) => r.code)]));
   const groupsWithPendingMatches = opts?.groupsWithPendingMatches ?? new Set<string>();
-  return { matchByNumber, teamById, teamCodeToId, groupTeamOrder, groupsWithPendingMatches };
+  const thirdPlaceTeamByWinnerGroup = opts?.thirdPlaceTeamByWinnerGroup ?? null;
+  const thirdPlaceGroupByWinnerGroup = opts?.thirdPlaceGroupByWinnerGroup ?? null;
+  return {
+    matchByNumber,
+    teamById,
+    teamCodeToId,
+    groupTeamOrder,
+    groupsWithPendingMatches,
+    thirdPlaceTeamByWinnerGroup,
+    thirdPlaceGroupByWinnerGroup,
+  };
 }
