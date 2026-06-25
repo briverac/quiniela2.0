@@ -39,6 +39,8 @@ export type BracketLabelContext = {
    * While a group is pending, 1X/2X display shows "TeamName (1X)" so users know the slot is provisional.
    */
   groupsWithPendingMatches: Set<string>;
+  /** True while any group-stage match is still open — keeps `3X` wildcards in predictions. */
+  groupStagePending: boolean;
   /** When Annex C is resolved: group-winner letter (A–L) → third-place team code for that R32 slot. */
   thirdPlaceTeamByWinnerGroup: Map<string, string> | null;
   /** Parallel map: winner group letter → third-place group letter (for `3D` suffix). */
@@ -88,6 +90,43 @@ function resolveThirdPoolTeamCode(
   return ctx.thirdPlaceTeamByWinnerGroup.get(winner) ?? null;
 }
 
+/** Provisional third-place label for match rows, e.g. `United States (3D)`. */
+export function formatThirdPlacePreview(
+  thirdGroup: string,
+  teamCode: string,
+  ctx: BracketLabelContext
+): string {
+  if (!ctx.groupStagePending) return teamName(teamCode);
+  return formatThirdPlaceSlotDisplay(thirdGroup, teamCode);
+}
+
+/** Annex C / best-thirds: always show FIFA slot wildcards — ranking among thirds can still change. */
+export function formatGroupWinnerSlotDisplay(groupLetter: string, ctx: BracketLabelContext): string {
+  const g = groupLetter.toUpperCase();
+  const code = ctx.groupTeamOrder.get(g)?.[0];
+  if (!code) return `1${g}`;
+  return `${teamName(code)} (1${g})`;
+}
+
+export function formatThirdPlaceSlotDisplay(thirdGroup: string, teamCode: string): string {
+  return `${teamName(teamCode)} (3${thirdGroup.toUpperCase()})`;
+}
+
+export function formatAnnexMatchupPreview(
+  thirdGroup: string,
+  teamCode: string,
+  winnerGroup: string,
+  ctx: BracketLabelContext
+): string {
+  const third = formatThirdPlaceSlotDisplay(thirdGroup, teamCode);
+  const rival = formatGroupWinnerSlotDisplay(winnerGroup, ctx);
+  return `${rival} vs ${third}`;
+}
+
+export function groupWinnerTeamCode(groupLetter: string, ctx: BracketLabelContext): string | null {
+  return ctx.groupTeamOrder.get(groupLetter.toUpperCase())?.[0] ?? null;
+}
+
 function resolveThirdPoolDisplay(
   poolLabel: string | null | undefined,
   otherLabel: string | null | undefined,
@@ -99,12 +138,11 @@ function resolveThirdPoolDisplay(
       ? ctx.thirdPlaceTeamByWinnerGroup.get(winner)
       : undefined;
   if (code) {
-    const name = teamName(code);
     const thirdGroup = winner ? ctx.thirdPlaceGroupByWinnerGroup?.get(winner) : undefined;
-    if (thirdGroup && ctx.groupsWithPendingMatches.has(thirdGroup)) {
-      return `${name} (3${thirdGroup})`;
+    if (thirdGroup && ctx.groupStagePending) {
+      return formatThirdPlacePreview(thirdGroup, code, ctx);
     }
-    return name;
+    return teamName(code);
   }
   const trimmed = poolLabel?.trim();
   if (!trimmed) return null;
@@ -250,6 +288,7 @@ export function matchTeamFlagCodes(
 
 export type BuildBracketLabelContextOpts = {
   groupsWithPendingMatches?: Set<string>;
+  groupStagePending?: boolean;
   thirdPlaceTeamByWinnerGroup?: Map<string, string> | null;
   thirdPlaceGroupByWinnerGroup?: Map<string, string> | null;
 };
@@ -265,6 +304,7 @@ export function buildBracketLabelContext(
   const teamCodeToId = new Map(teams.map((t) => [t.code, t.id]));
   const groupTeamOrder = new Map(groupStandings.map((g) => [g.code, g.teams.map((r) => r.code)]));
   const groupsWithPendingMatches = opts?.groupsWithPendingMatches ?? new Set<string>();
+  const groupStagePending = opts?.groupStagePending ?? groupsWithPendingMatches.size > 0;
   const thirdPlaceTeamByWinnerGroup = opts?.thirdPlaceTeamByWinnerGroup ?? null;
   const thirdPlaceGroupByWinnerGroup = opts?.thirdPlaceGroupByWinnerGroup ?? null;
   return {
@@ -273,6 +313,7 @@ export function buildBracketLabelContext(
     teamCodeToId,
     groupTeamOrder,
     groupsWithPendingMatches,
+    groupStagePending,
     thirdPlaceTeamByWinnerGroup,
     thirdPlaceGroupByWinnerGroup,
   };

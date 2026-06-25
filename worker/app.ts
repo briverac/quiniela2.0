@@ -30,7 +30,7 @@ import {
   validRealScores,
 } from "./lib/matchLogic";
 import { teamName, phaseName, tournamentName } from "./lib/i18n";
-import { resolveBracketLabel, matchTeamFlagCodes } from "./lib/bracketLabels";
+import { resolveBracketLabel, matchTeamFlagCodes, formatGroupWinnerSlotDisplay, formatThirdPlaceSlotDisplay, groupWinnerTeamCode } from "./lib/bracketLabels";
 import { defaultWc26ThirdTeam2Label } from "./lib/wc26ThirdSlotDefaults";
 import { rankBestThirdPlaceTeams } from "./lib/bestThirdPlace";
 import { buildThirdPlaceTeamByWinner } from "./lib/thirdPlaceAnnexC";
@@ -436,7 +436,9 @@ app.get("/api/groups/standings", async (c) => {
 app.get("/api/groups/best-thirds", async (c) => {
   const u = c.var.user;
   if (!u?.active) return c.json({ error: "Unauthorized" }, 401);
-  const groups = await groupStandings(c.var.db, CA);
+  const pack = await gatherBracketLabelPack(c.var.db, CA);
+  if (!pack) return tournamentNotFound(c, CA);
+  const { standings: groups, bracketCtx } = pack;
   const ranked = rankBestThirdPlaceTeams(groups);
   const qualified = ranked.filter((r) => r.qualified);
   const annexBuilt =
@@ -446,14 +448,6 @@ app.get("/api/groups/best-thirds", async (c) => {
     data: ranked.map((t) => ({
       ...t,
       name: teamName(t.code),
-      r32Opponent: annexBuilt
-        ? (() => {
-            for (const [winner, thirdGroup] of Object.entries(annexBuilt.byWinner)) {
-              if (thirdGroup === t.groupCode) return `1${winner}`;
-            }
-            return null;
-          })()
-        : null,
     })),
     annex: annexBuilt
       ? {
@@ -463,11 +457,10 @@ app.get("/api/groups/best-thirds", async (c) => {
             const third = stand?.teams[2];
             return {
               matchNumber: s.matchNumber,
-              winnerGroup: s.winnerGroup,
-              thirdGroup: s.thirdGroup,
-              opponentLabel: `1${s.winnerGroup}`,
+              opponentTeamCode: groupWinnerTeamCode(s.winnerGroup, bracketCtx),
+              opponentLabel: formatGroupWinnerSlotDisplay(s.winnerGroup, bracketCtx),
               thirdTeamCode: third?.code ?? null,
-              thirdTeamName: third ? teamName(third.code) : null,
+              thirdLabel: third ? formatThirdPlaceSlotDisplay(s.thirdGroup, third.code) : null,
             };
           }),
         }

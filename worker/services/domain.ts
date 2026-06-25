@@ -503,6 +503,7 @@ export async function gatherBracketLabelPack(db: Db, tournamentCode: string) {
     standings,
     {
       groupsWithPendingMatches,
+      groupStagePending: groupsWithPendingMatches.size > 0,
       thirdPlaceTeamByWinnerGroup: (() => {
         const ranked = rankBestThirdPlaceTeams(standings);
         const qualifiedGroups = ranked.filter((r) => r.qualified).map((r) => r.groupCode);

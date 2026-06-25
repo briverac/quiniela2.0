@@ -17,16 +17,14 @@ type Row = {
   goalAgainst: number;
   goalDifference: number;
   points: number;
-  r32Opponent: string | null;
 };
 
 type AnnexSlot = {
   matchNumber: number;
-  winnerGroup: string;
-  thirdGroup: string;
-  opponentLabel: string;
+  opponentTeamCode: string | null;
+  opponentLabel: string | null;
   thirdTeamCode: string | null;
-  thirdTeamName: string | null;
+  thirdLabel: string | null;
 };
 
 type ApiRes = {
@@ -70,32 +68,46 @@ export default function BestThirds() {
 
       {annex && (
         <section className="phase-block">
-          <h2 className="subsection-title">Round of 32 assignments (FIFA Annex C)</h2>
-          <p className="muted">
-            Combination key: <code>{annex.combinationKey}</code> — which groups produced a qualifying
-            third. Each row is a fixed R32 slot (no draw).
+          <h2 className="subsection-title">Round of 32 matchups</h2>
+          <p className="muted" style={{ maxWidth: "42rem", lineHeight: 1.55 }}>
+            Given today&apos;s top eight third-placed groups (<code>{annex.combinationKey}</code>), FIFA
+            Annex C fixes who plays whom — no draw. Each row is an R32 fixture: the{" "}
+            <strong>group winner</strong> on the left (<code>1A</code>, <code>1E</code>, …) vs the{" "}
+            <strong>third from the assigned group</strong> on the right (<code>3C</code>, <code>3D</code>, …).
+            Names and flags are from current standings; the letters are the FIFA slots.
+          </p>
+          <p className="muted" style={{ maxWidth: "42rem", lineHeight: 1.55 }}>
+            A group may already be finished — the third can still drop out of the top eight if another
+            third overtakes them. The ranking table below shows who would advance today.
           </p>
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Match #</th>
-                  <th>Opponent</th>
-                  <th>Third (group)</th>
-                  <th>Team</th>
+                  <th>Match</th>
+                  <th>Matchup</th>
                 </tr>
               </thead>
               <tbody>
                 {annex.slots.map((s) => (
                   <tr key={s.matchNumber}>
-                    <td>{s.matchNumber}</td>
-                    <td>{s.opponentLabel}</td>
-                    <td>3{s.thirdGroup}</td>
+                    <td>#{s.matchNumber}</td>
                     <td>
-                      {s.thirdTeamCode ? (
-                        <span className="team-with-flag">
-                          <TeamFlag code={s.thirdTeamCode} title={s.thirdTeamName ?? undefined} />
-                          {s.thirdTeamName}
+                      {s.opponentLabel && s.thirdLabel ? (
+                        <span className="match-teams">
+                          <span className="team-with-flag">
+                            {s.opponentTeamCode && (
+                              <TeamFlag code={s.opponentTeamCode} title={s.opponentLabel} />
+                            )}
+                            {s.opponentLabel}
+                          </span>
+                          <span className="muted">vs</span>
+                          <span className="team-with-flag">
+                            {s.thirdTeamCode && (
+                              <TeamFlag code={s.thirdTeamCode} title={s.thirdLabel} />
+                            )}
+                            {s.thirdLabel}
+                          </span>
                         </span>
                       ) : (
                         "—"
@@ -109,7 +121,9 @@ export default function BestThirds() {
         </section>
       )}
 
-      <div className="table-wrap">
+      <section className="phase-block">
+        <h2 className="subsection-title">Third-place ranking</h2>
+        <div className="table-wrap">
         <table className="table table-best-thirds">
           <thead>
             <tr>
@@ -124,7 +138,6 @@ export default function BestThirds() {
               <th>GA</th>
               <th>GD</th>
               <th>Pts</th>
-              <th>R32</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -154,16 +167,16 @@ export default function BestThirds() {
                 <td>{t.goalAgainst}</td>
                 <td>{t.goalDifference}</td>
                 <td>{t.points}</td>
-                <td>{t.r32Opponent ?? "—"}</td>
                 <td>{t.qualified ? "Advances" : "Eliminated"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
       {rows.length >= 8 && (
         <p className="muted">Cut line after rank 8 — positions 9–12 are out.</p>
       )}
+      </section>
     </div>
   );
 }

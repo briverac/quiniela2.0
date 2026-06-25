@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBracketLabelContext,
+  formatThirdPlacePreview,
+  formatAnnexMatchupPreview,
+  formatGroupWinnerSlotDisplay,
   resolveBracketLabel,
   resolveBracketTeamCode,
   matchTeamFlagCodes,
@@ -166,13 +169,91 @@ describe("resolveBracketLabel", () => {
     expect(resolveBracketTeamCode("3ABCDF", ctx, "1E")).toBe("usa");
   });
 
-  it("shows 3D suffix when third-place group still open", () => {
-    const ctx = buildBracketLabelContext([], [], [], {
-      groupsWithPendingMatches: new Set(["D"]),
-      thirdPlaceTeamByWinnerGroup: new Map([["E", "usa"]]),
-      thirdPlaceGroupByWinnerGroup: new Map([["E", "D"]]),
-    });
+  it("shows 3D suffix while group stage is still open", () => {
+    const ctx = buildBracketLabelContext(
+      [],
+      [],
+      [
+        { code: "D", teams: [{ code: "usa" }, { code: "mex" }, { code: "can" }] },
+        { code: "E", teams: [{ code: "ger" }, { code: "fra" }, { code: "esp" }] },
+      ],
+      {
+        groupsWithPendingMatches: new Set(["F"]),
+        groupStagePending: true,
+        thirdPlaceTeamByWinnerGroup: new Map([["E", "usa"]]),
+        thirdPlaceGroupByWinnerGroup: new Map([["E", "D"]]),
+      }
+    );
     expect(resolveBracketLabel("3ABCDF", ctx, "1E")).toBe("United States (3D)");
+  });
+
+  it("shows 3D suffix even when that third's group already closed but group stage open", () => {
+    const ctx = buildBracketLabelContext(
+      [],
+      [],
+      [
+        { code: "C", teams: [{ code: "mex" }, { code: "usa" }, { code: "sco" }] },
+        { code: "A", teams: [{ code: "mex" }, { code: "can" }, { code: "usa" }] },
+      ],
+      {
+        groupsWithPendingMatches: new Set(["B"]),
+        groupStagePending: true,
+        thirdPlaceTeamByWinnerGroup: new Map([["A", "sco"]]),
+        thirdPlaceGroupByWinnerGroup: new Map([["A", "C"]]),
+      }
+    );
+    expect(resolveBracketLabel("3ABC", ctx, "1A")).toBe("Scotland (3C)");
+  });
+
+  it("drops 3X suffix once entire group stage is finished", () => {
+    const ctx = buildBracketLabelContext(
+      [],
+      [],
+      [
+        { code: "D", teams: [{ code: "usa" }, { code: "mex" }, { code: "can" }] },
+        { code: "E", teams: [{ code: "ger" }, { code: "fra" }, { code: "esp" }] },
+      ],
+      {
+        groupsWithPendingMatches: new Set(),
+        groupStagePending: false,
+        thirdPlaceTeamByWinnerGroup: new Map([["E", "usa"]]),
+        thirdPlaceGroupByWinnerGroup: new Map([["E", "D"]]),
+      }
+    );
+    expect(resolveBracketLabel("3ABCDF", ctx, "1E")).toBe("United States");
+  });
+
+  it("1X keeps suffix on its own side while group stage open", () => {
+    const ctx = buildBracketLabelContext(
+      [],
+      [],
+      [
+        { code: "D", teams: [{ code: "usa" }, { code: "mex" }, { code: "can" }] },
+        { code: "E", teams: [{ code: "ger" }, { code: "fra" }, { code: "esp" }] },
+      ],
+      {
+        groupsWithPendingMatches: new Set(["D", "E"]),
+        groupStagePending: true,
+        thirdPlaceTeamByWinnerGroup: new Map([["E", "usa"]]),
+        thirdPlaceGroupByWinnerGroup: new Map([["E", "D"]]),
+      }
+    );
+    expect(resolveBracketLabel("3ABCDF", ctx, "1E")).toBe("United States (3D)");
+    expect(resolveBracketLabel("1E", ctx)).toBe("Germany (1E)");
+  });
+
+  it("annex preview always shows 3X and 1Y wildcards even when groups closed", () => {
+    const ctx = buildBracketLabelContext(
+      [],
+      [],
+      [
+        { code: "C", teams: [{ code: "mex" }, { code: "usa" }, { code: "sco" }] },
+        { code: "A", teams: [{ code: "mex" }, { code: "can" }, { code: "usa" }] },
+      ],
+      { groupsWithPendingMatches: new Set() }
+    );
+    expect(formatAnnexMatchupPreview("C", "sco", "A", ctx)).toBe("Mexico (1A) vs Scotland (3C)");
+    expect(formatGroupWinnerSlotDisplay("A", ctx)).toBe("Mexico (1A)");
   });
 
   it("resolves 3-pool label to description when Annex C unknown", () => {
