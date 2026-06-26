@@ -176,6 +176,28 @@ function localDayInfo(iso: string): { key: string; label: string } {
   return { key, label };
 }
 
+function todayLocalKey(now = new Date()): string {
+  return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+}
+
+function scrollToAnchor(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/** Day bucket key for today, or the next calendar day with matches. */
+function resolveScrollDayKey(matches: BootMatch[]): string | null {
+  const todayKey = todayLocalKey();
+  const dayKeys = new Set(matches.map((m) => localDayInfo(m.date).key));
+  if (dayKeys.has(todayKey)) return todayKey;
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const next = [...matches]
+    .filter((m) => new Date(m.date) >= startOfToday)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+  return next ? localDayInfo(next.date).key : null;
+}
+
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -282,7 +304,7 @@ function MatchPredictionRow({
       ]
     : [];
   return (
-    <tr className="predictions-row">
+    <tr className="predictions-row" id={`predictions-match-${m.number}`}>
       <td>{m.number}</td>
       {timeLabel != null && <td className="predictions-time">{timeLabel}</td>}
       {phaseLabel != null && <td className="predictions-phase">{phaseLabel}</td>}
@@ -362,6 +384,7 @@ export default function Predictions() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [order, setOrder] = useState<OrderMode>(readOrderPref);
+  const [pendingScrollDayKey, setPendingScrollDayKey] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -409,6 +432,29 @@ export default function Predictions() {
     () => buildTeamResultsIndex(boot?.matches ?? []),
     [boot?.matches]
   );
+
+  useEffect(() => {
+    if (order !== "date" || !pendingScrollDayKey) return;
+    const id = `predictions-day-${pendingScrollDayKey}`;
+    const t = requestAnimationFrame(() => {
+      scrollToAnchor(id);
+      setPendingScrollDayKey(null);
+    });
+    return () => cancelAnimationFrame(t);
+  }, [order, pendingScrollDayKey, dayBuckets]);
+
+  const goToToday = () => {
+    if (!boot) return;
+    const dayKey = resolveScrollDayKey(boot.matches);
+    if (!dayKey) return;
+
+    if (order !== "date") {
+      setPendingScrollDayKey(dayKey);
+      setOrder("date");
+      return;
+    }
+    scrollToAnchor(`predictions-day-${dayKey}`);
+  };
 
   const putPredictions = async (items: { predictionId: number; score1: number; score2: number }[]) => {
     if (!items.length) return;
@@ -474,10 +520,15 @@ export default function Predictions() {
       {msg && <p className="ok">{msg}</p>}
       {err && <p className="error">{err}</p>}
 
-      <div className="actions form-row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <button type="button" className="button primary" onClick={save}>
-          Save predictions
-        </button>
+      <div className="actions form-row predictions-toolbar">
+        <div className="predictions-toolbar__actions">
+          <button type="button" className="button primary" onClick={save}>
+            Save predictions
+          </button>
+          <button type="button" className="button" onClick={goToToday}>
+            Today&apos;s matches
+          </button>
+        </div>
         <div className="tabs view-toggle" role="group" aria-label="How to order matches">
           <button
             type="button"
@@ -553,7 +604,9 @@ export default function Predictions() {
           <h2 className="sr-only">All matches by date</h2>
           {dayBuckets.map((bucket) => (
             <div key={bucket.key} className="day-block">
-              <h3 className="subsection-title">{bucket.label}</h3>
+              <h3 id={`predictions-day-${bucket.key}`} className="subsection-title predictions-day-anchor">
+                {bucket.label}
+              </h3>
               <div className="table-wrap">
               <table className="table table-predictions">
                 <thead>

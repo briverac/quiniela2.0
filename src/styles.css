@@ -308,6 +308,24 @@ a {
   margin-top: 0.5rem;
 }
 
+.predictions-day-anchor {
+  scroll-margin-top: 1.25rem;
+}
+
+.predictions-toolbar {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.predictions-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
